@@ -2,40 +2,48 @@
 
 Painel financeiro da **Key Marketing Digital**: entradas e saídas, notas fiscais emitidas, impostos e obrigações, calendário de vencimentos e provisão de 13º e férias.
 
-**Painel em uso:** https://claude.ai/artifact/Svw8dJrhdPQs9pmySbk6FA
+**Painel:** https://soydeoliveira-create.github.io/key-marketing-financeiro/
 
-## O que fica aqui e o que não fica
+## Onde ficam as coisas
 
-Este repositório guarda **o código** do painel (`index.html`) e o histórico das versões.
-
-**Os dados não ficam aqui.** Lançamentos, notas, obrigações e os valores do 13º ficam no banco de dados do próprio Artifact no claude.ai e só aparecem pelo link acima. Aberto fora do claude.ai (direto no navegador ou pelo GitHub Pages), o painel mostra a tela, mas avisa que não consegue salvar nada.
-
-## Abas
-
-| Aba | Para que serve |
+| O quê | Onde |
 | --- | --- |
-| Visão geral | Entradas, saídas, resultado do mês, o que falta pagar e próximos vencimentos |
-| Entradas e saídas | Lançamentos do mês por categoria; exporta CSV |
-| Notas fiscais | Notas emitidas; "Recebi" lança o valor nas entradas |
-| Impostos e obrigações | DAS, INSS, DEFIS e outras; "Marcar pago" lança a saída |
-| Calendário | Vencimentos do mês, com feriados nacionais |
-| 13º e férias | Média do que a PJ recebeu no ano |
+| Código do painel (`index.html`) | Este repositório, publicado pelo GitHub Pages |
+| Dados (lançamentos, notas, impostos, 13º) | Supabase, projeto `key-marketing-financeiro` (São Paulo) |
+| Login | Supabase Auth, com e-mail e senha |
+
+A chave que aparece no `index.html` é a chave **pública** do Supabase. Ela sozinha não lê nada: as tabelas só respondem para quem entrou com uma conta liberada.
+
+## Quem tem acesso
+
+- A **primeira conta criada** no painel fica com acesso automaticamente.
+- Qualquer outra conta consegue entrar, mas não vê nem altera dados.
+- Para liberar mais alguém, rode no SQL Editor do Supabase, depois que a pessoa criar a conta:
+
+```sql
+insert into public.membros (user_id, email)
+select id, email from auth.users where email = 'email-da-pessoa@exemplo.com';
+```
+
+## Tabelas
+
+`lancamentos`, `notas`, `obrigacoes`, `modelos` (obrigações recorrentes), `beneficios` (valores do 13º por ano), `config` (alíquota do DAS) e `membros`.
 
 ## Regras de cálculo
 
-- **DAS estimado** = faturado nas notas do mês × alíquota efetiva (configurável na aba de impostos). Vence no dia 20 do mês seguinte.
+- **DAS estimado** = faturado nas notas do mês × alíquota efetiva. Vence no dia 20 do mês seguinte.
 - **Vencimento em fim de semana ou feriado:** o DAS passa para o próximo dia útil; INSS e FGTS são antecipados.
 - **13º** = soma dos meses lançados ÷ número de meses com valor.
 - **Férias** = 13º + 1/3 do 13º.
 
 ## Como atualizar
 
-1. Altere o `index.html` (ou peça a alteração ao Claude).
-2. Republique o Artifact no mesmo link, para que o painel em uso receba a mudança.
-3. Envie para o GitHub:
+Altere o `index.html` e envie:
 
 ```
 git add .
 git commit -m "o que mudou"
 git push
 ```
+
+O GitHub Pages publica a nova versão em um ou dois minutos.
