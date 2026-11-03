@@ -363,7 +363,9 @@ function render(){
 
 /* 13º e férias: média do que a PJ recebeu no ano */
 function benefMeses(y){return(S.benef[String(y)]||{}).meses||{}}
-function entradasMes(k){return S.lanc.filter(l=>l.tipo==='entrada'&&l.status!=='pendente'&&inMonth(l.data,k)&&l.categoria!=='Aporte dos sócios').reduce((a,l)=>a+(+l.valor||0),0)}
+const dia5=s=>!!s&&s.slice(8,10)==='05';
+// só o recebimento marcado (o do dia 5) entra na base do 13º e das férias
+function entradasMes(k){return S.lanc.filter(l=>l.tipo==='entrada'&&l.status!=='pendente'&&l.contaBeneficio===true&&inMonth(l.data,k)).reduce((a,l)=>a+(+l.valor||0),0)}
 function calcBenef(y){
   const ms=benefMeses(y);const vals=MESES.map((_,i)=>+ms[pad(i+1)]||0);
   const n=vals.filter(v=>v>0).length,soma=vals.reduce((a,b)=>a+b,0);
@@ -384,13 +386,14 @@ function vBeneficios(){
   <section class="grid2">
   <div class="panel">
     <div class="ph"><h2>Valores recebidos pela PJ em ${y}</h2>
-      <button class="btn sm" data-act="preencherBenef" ${S.canWrite&&vazios?'':'disabled'} title="Copia as entradas recebidas de cada mês vazio, sem contar aporte dos sócios">${vazios?`Puxar das entradas (${vazios} ${vazios>1?'meses':'mês'})`:'Nada para puxar das entradas'}</button></div>
-    <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Valor recebido</th><th class="num">Entradas no painel</th></tr></thead><tbody>
+      <button class="btn sm" data-act="preencherBenef" ${S.canWrite&&vazios?'':'disabled'} title="Copia, para cada mês vazio, as entradas marcadas como “Conta para 13º e férias”">${vazios?`Puxar o recebimento do dia 5 (${vazios} ${vazios>1?'meses':'mês'})`:'Nada para puxar do dia 5'}</button></div>
+    <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Valor recebido</th><th class="num">Recebido no dia 5</th></tr></thead><tbody>
     ${MESES.map((m,i)=>{const k=pad(i+1),v=c.vals[i],e=entradasMes(ym(y,i+1));return`<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td>
       <td class="num"><input id="bm-${y}-${k}" data-bm="${k}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Valor recebido em ${m}" ${dis}></td>
       <td class="num"><span class="muted">${e?brl(e):'—'}</span></td></tr>`}).join('')}
     </tbody><tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td><td></td></tr></tfoot></table></div>
-    <p class="note" style="margin:12px 0 0">Mês em branco ou zerado não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
+    <p class="note" style="margin:12px 0 0">Só o recebimento do dia 5 entra nesta conta. Em “Entradas e saídas”, a entrada do dia 5 já vem marcada como <b>Conta para 13º e férias</b>. Se o pagamento cair em outro dia, marque a caixa na mão. Os demais recebimentos do mês ficam fora.</p>
+    <p class="note" style="margin:8px 0 0">Mês em branco ou zerado não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
   </div>
   <div class="panel">
     <div class="ph"><h2>Como o cálculo é feito</h2></div>
@@ -489,7 +492,7 @@ function vLanc(){
         <button class="btn primary sm" data-act="novoLanc" ${S.canWrite?'':'disabled'}>+ Novo lançamento</button>
       </div></div>
     ${rows.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
-    ${rows.map(l=>`<tr><td>${fmtD(l.data).slice(0,5)}</td><td>${esc(l.descricao)}${l.origem==='nota'?'<span class="tag">nota fiscal</span>':l.origem==='obrigacao'?'<span class="tag">imposto</span>':''}${l.obs?`<div class="muted">${esc(l.obs)}</div>`:''}</td><td><span class="muted">${esc(l.categoria||'—')}</span></td>
+    ${rows.map(l=>`<tr><td>${fmtD(l.data).slice(0,5)}</td><td>${esc(l.descricao)}${l.origem==='nota'?'<span class="tag">nota fiscal</span>':l.origem==='obrigacao'?'<span class="tag">imposto</span>':''}${l.contaBeneficio&&l.tipo==='entrada'?'<span class="tag" style="color:var(--pink-ink);border-color:var(--pink)" title="Conta para a média do 13º e das férias">13º e férias</span>':''}${l.obs?`<div class="muted">${esc(l.obs)}</div>`:''}</td><td><span class="muted">${esc(l.categoria||'—')}</span></td>
       <td class="num"><span class="dir ${l.tipo==='entrada'?'in':'out'}">${l.tipo==='entrada'?'+':'−'} ${brl(l.valor)}</span></td>
       <td>${l.status==='pendente'?`<span class="pill wait">${l.tipo==='entrada'?'A receber':'A pagar'}</span>`:`<span class="pill ok">${l.tipo==='entrada'?'Recebido':'Pago'}</span>`}</td>
       <td class="acts">${acts('Lanc',l.id)}</td></tr>`).join('')}
@@ -626,7 +629,8 @@ const F={
     {k:'categoria',l:'Categoria',type:'list',list:r=>r.tipo==='saida'?CAT_OUT:CAT_IN},
     {k:'valor',l:'Valor (R$)',type:'money',req:1},
     {k:'status',l:'Situação',type:'select',opts:[['pago','Pago / recebido'],['pendente','Em aberto']]},
-    {k:'obs',l:'Observação',type:'text'}]},
+    {k:'obs',l:'Observação',type:'text'},
+    {k:'contaBeneficio',l:'Conta para 13º e férias (recebimento do dia 5)',type:'check',def:false}]},
   nota:{t:'nota fiscal',col:'notas',f:[
     {k:'numero',l:'Número da nota',type:'text',req:1},
     {k:'dataEmissao',l:'Data de emissão',type:'date',req:1},
@@ -666,7 +670,7 @@ function openForm(kind,rec,defaults){
     const id='f-'+f.k;const v=r[f.k]??'';
     let inp;
     if(f.type==='select')inp=`<select id="${id}" name="${f.k}">${f.opts.map(([a,b])=>`<option value="${a}" ${String(v)===a?'selected':''}>${b}</option>`).join('')}</select>`;
-    else if(f.type==='check')return `<div class="f check full"><input type="checkbox" id="${id}" name="${f.k}" ${v!==false?'checked':''}><label for="${id}">${f.l}</label></div>`;
+    else if(f.type==='check'){const on=v===''?f.def!==false:!!v;return `<div class="f check full"><input type="checkbox" id="${id}" name="${f.k}" ${on?'checked':''}><label for="${id}">${f.l}</label></div>`}
     else if(f.type==='list')inp=`<input id="${id}" name="${f.k}" list="${id}-l" value="${esc(v)}" ${f.req?'required':''} autocomplete="off"><datalist id="${id}-l">${f.list(r).map(o=>`<option value="${esc(o)}">`).join('')}</datalist>`;
     else if(f.type==='money')inp=`<input id="${id}" name="${f.k}" type="number" step="0.01" min="0" inputmode="decimal" value="${v===''?'':esc(v)}" ${f.req?'required':''}>`;
     else inp=`<input id="${id}" name="${f.k}" type="${f.type}" value="${esc(v)}" ${f.req?'required':''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}>`;
@@ -679,7 +683,11 @@ function openForm(kind,rec,defaults){
   document.body.appendChild(modal);
   const form=modal.querySelector('form');
   modal.addEventListener('click',e=>{if(e.target===modal||e.target.closest('[data-close]'))closeModal()});
-  if(kind==='lanc'){const tp=form.tipo;tp.addEventListener('change',()=>{document.getElementById('f-categoria-l').innerHTML=(tp.value==='saida'?CAT_OUT:CAT_IN).map(o=>`<option value="${esc(o)}">`).join('')})}
+  if(kind==='lanc'){const tp=form.tipo;tp.addEventListener('change',()=>{document.getElementById('f-categoria-l').innerHTML=(tp.value==='saida'?CAT_OUT:CAT_IN).map(o=>`<option value="${esc(o)}">`).join('')})
+    // marca sozinho quando é entrada do dia 5, até a pessoa mexer na caixa
+    const cb=form.contaBeneficio,linha=cb.closest('.f');let mexeu=!!rec;cb.addEventListener('change',()=>mexeu=true);
+    const auto=()=>{linha.hidden=tp.value!=='entrada';if(tp.value!=='entrada')cb.checked=false;else if(!mexeu)cb.checked=dia5(form.data.value)};
+    tp.addEventListener('change',auto);form.data.addEventListener('change',auto);linha.hidden=tp.value!=='entrada'}
   setTimeout(()=>form.querySelector('input,select')?.focus(),30);
   form.addEventListener('submit',async e=>{
     e.preventDefault();const err=modal.querySelector('#ferr');
@@ -743,7 +751,8 @@ async function save(kind,rec,out){
 }
 async function syncNota(n){
   const lid='nf-'+n.id;
-  if(n.status==='recebida')await put('lancamentos',lid,{tipo:'entrada',data:n.recebidoEm||hoje(),descricao:`NF ${n.numero} · ${n.cliente}`,categoria:'Serviços prestados',valor:Math.round(((+n.valor||0)-(+n.issRetido||0))*100)/100,status:'pago',origem:'nota',origemId:n.id,obs:+n.issRetido?`ISS retido ${brl(n.issRetido)}`:''});
+  const ex=S.lanc.find(l=>l.id===lid);
+  if(n.status==='recebida')await put('lancamentos',lid,{contaBeneficio:ex?ex.contaBeneficio===true:dia5(n.recebidoEm||hoje()),tipo:'entrada',data:n.recebidoEm||hoje(),descricao:`NF ${n.numero} · ${n.cliente}`,categoria:'Serviços prestados',valor:Math.round(((+n.valor||0)-(+n.issRetido||0))*100)/100,status:'pago',origem:'nota',origemId:n.id,obs:+n.issRetido?`ISS retido ${brl(n.issRetido)}`:''});
   else if(S.lanc.some(l=>l.id===lid))await del('lancamentos',lid);
 }
 async function syncOb(o){
@@ -758,7 +767,7 @@ async function act(a,id,btn){
   const L=S.lanc.find(x=>x.id===id),N=S.notas.find(x=>x.id===id),O=S.obrig.find(x=>x.id===id),M=S.modelos.find(x=>x.id===id);
   try{
   switch(a){
-    case'novoLanc':return openForm('lanc',null,{tipo:S.lancTipo==='saida'?'saida':'entrada',data:inMonth(hoje())?hoje():iso(S.ref.y,S.ref.m,1),status:'pago'});
+    case'novoLanc':{const tipo=S.lancTipo==='saida'?'saida':'entrada',data=inMonth(hoje())?hoje():iso(S.ref.y,S.ref.m,1);return openForm('lanc',null,{tipo,data,status:'pago',contaBeneficio:tipo==='entrada'&&dia5(data)})}
     case'editLanc':if(L?.origem==='nota'){const n=S.notas.find(x=>x.id===L.origemId);if(n)return openForm('nota',n)}if(L?.origem==='obrigacao'){const o=S.obrig.find(x=>x.id===L.origemId);if(o)return openForm('ob',o)}return openForm('lanc',L);
     case'novaNota':return openForm('nota',null,{dataEmissao:inMonth(hoje())?hoje():iso(S.ref.y,S.ref.m,1),status:'areceber'});
     case'editNota':return openForm('nota',N);
