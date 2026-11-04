@@ -1437,7 +1437,7 @@ document.getElementById('loginForm').addEventListener('submit',async e=>{
     }
   }catch(x){
     const m=x?.message||'';
-    lgMsg(/invalid login/i.test(m)?'E-mail ou senha incorretos.':/not confirmed/i.test(m)?'Confirme seu e-mail pelo link que enviamos antes de entrar.':/already registered/i.test(m)?'Este e-mail já tem conta. Use “Já tenho conta. Entrar”.':/rate limit/i.test(m)?'Muitas tentativas seguidas. Espere alguns minutos.':'Não deu certo: '+m);
+    lgMsg(/invalid login/i.test(m)?'E-mail ou senha incorretos.':/not confirmed/i.test(m)?'Confirme seu e-mail pelo link que enviamos antes de entrar.':/already registered/i.test(m)?'Este e-mail já tem conta. Use “Já tenho conta. Entrar”.':/email rate limit/i.test(m)?'O sistema atingiu o limite de e-mails de confirmação por hora (não é por causa das suas tentativas). Tente de novo em uma hora ou fale com quem administra o AIME Financy.':/rate limit/i.test(m)?'Muitas tentativas seguidas. Espere alguns minutos.':'Não deu certo: '+m);
   }finally{btn.disabled=false}
 });
 document.getElementById('btnSair').onclick=()=>sb.auth.signOut();
