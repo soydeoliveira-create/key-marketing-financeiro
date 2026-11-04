@@ -199,6 +199,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
 .resumo .rfoot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;opacity:.85}
 .resumo .btn.ghost{color:var(--hero-fg);border-color:rgba(255,255,255,.28)}
 .resumo .btn.ghost:hover{background:rgba(255,255,255,.08);color:var(--hero-fg)}
+.resumo .rcol.full{grid-column:1/-1}
+.resumo .rp{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.12)}
+.resumo .rp time{font-size:13px;font-weight:700}
+.resumo .rp span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resumo .rp small{opacity:.65;font-size:12px;margin-left:6px}
 @media (max-width:620px){.resumo .rcols{grid-template-columns:minmax(0,1fr)}.resumo .rt{text-align:left}.resumo .rt b{font-size:28px}}
 .cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .note{font-size:13px;color:var(--ink-2);max-width:68ch}
@@ -342,7 +347,7 @@ const CAT_IN=['Serviços prestados','Gestão de redes sociais','Tráfego pago (g
 const CAT_OUT=['Impostos e taxas','Pró-labore','Mídia paga (anúncios)','Ferramentas e softwares','Freelancers e fornecedores','Contabilidade','Aluguel e coworking','Internet e telefone','Tarifas bancárias','Equipamentos','Outras saídas'];
 
 const now=new Date();
-const S={lanc:[],notas:[],obrig:[],modelos:[],benef:{},clt:{},config:{aliquota:6},ref:{y:now.getFullYear(),m:now.getMonth()+1},view:'geral',dia:null,lancTipo:'todos',db:null,canWrite:true,loaded:0,offline:false};
+const S={lanc:[],notas:[],obrig:[],modelos:[],benef:{},clt:{},desc:[],config:{aliquota:6},ref:{y:now.getFullYear(),m:now.getMonth()+1},view:'geral',dia:null,lancTipo:'todos',db:null,canWrite:true,loaded:0,offline:false};
 try{const v=localStorage.getItem('km-view');if(v)S.view=v}catch(e){}
 const h=location.hash.replace('#','');if(['geral','lanc','notas','impostos','cal','beneficios','clt'].includes(h))S.view=h;
 
@@ -413,7 +418,12 @@ function cltCalc(y){
   const n=vals.filter(v=>v>0).length,soma=vals.reduce((a,b)=>a+b,0);
   const dec=n?soma/n:0,terco=dec/3,fer=dec+terco;
   const deps=+S.config.cltDependentes||0;
-  const l13=liquido(dec,deps,false),lFer=liquido(fer,deps,true);
+  // outros descontos cadastrados (plano de saúde, empréstimo…) saem do líquido
+  const ativos=S.desc.filter(d=>d.ativo!==false&&+d.valor>0);
+  const soma_=k=>r2(ativos.filter(d=>d.aplicaEm===k||d.aplicaEm==='ambos'||!d.aplicaEm).reduce((a,d)=>a+(+d.valor||0),0));
+  const o13=soma_('13'),oFer=soma_('ferias');
+  const b13=liquido(dec,deps,false),bFer=liquido(fer,deps,true);
+  const l13={...b13,outros:o13,liq:r2(b13.liq-o13)},lFer={...bFer,outros:oFer,liq:r2(bFer.liq-oFer)};
   return{adm,ini,vals,n,soma,dec,terco,fer,total:dec+fer,deps,l13,lFer,parc1:r2(dec/2),parc2:r2(l13.liq-dec/2)};
 }
 function vClt(){
@@ -457,6 +467,7 @@ function vClt(){
       <div><span>13º bruto</span><b>${brl(c.l13.bruto)}</b></div>
       <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(c.l13.inss)}</b></div>
       <div><span>− Imposto de Renda<span class="op">${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(c.l13.ir)}</b></div>
+      ${c.l13.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('13'))}</span></span><b class="neg">${brl(c.l13.outros)}</b></div>`:''}
       <div><span><b>13º líquido</b></span><span class="big">${brl(c.l13.liq)}</span></div>
       <div><span>1ª parcela, até 30/11<span class="op">metade do bruto, sem desconto</span></span><b>${brl(c.parc1)}</b></div>
       <div><span>2ª parcela, até 20/12<span class="op">líquido − 1ª parcela</span></span><b>${brl(c.parc2)}</b></div>
@@ -468,10 +479,23 @@ function vClt(){
       <div><span>Férias + 1/3 bruto</span><b>${brl(c.lFer.bruto)}</b></div>
       <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(c.lFer.inss)}</b></div>
       <div><span>− Imposto de Renda<span class="op">${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(c.lFer.ir)}</b></div>
+      ${c.lFer.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('ferias'))}</span></span><b class="neg">${brl(c.lFer.outros)}</b></div>`:''}
       <div><span><b>Férias líquido</b></span><span class="big pos">${brl(c.lFer.liq)}</span></div>
     </div>
-    <p class="note" style="margin:12px 0 0">Estimativa com as tabelas de 2026. O holerite da empresa é o valor oficial: o INSS das férias pode sair diferente, porque a empresa soma as férias ao salário do mês. ${c.deps?'':'Se você tem dependentes no IR, informe em “Alterar admissão”.'}</p>
-  </div></section>`;
+    <p class="note" style="margin:12px 0 0">Estimativa com as tabelas de 2026. O holerite da empresa é o valor oficial: o INSS das férias pode sair diferente, porque a empresa soma as férias ao salário do mês. ${c.deps?'':'Se você tem dependentes no IR, informe em “Admissão e dependentes”.'}</p>
+  </div></section>
+  ${vDescontos()}`;
+}
+const APLICA={ambos:'13º e férias','13':'Só no 13º',ferias:'Só nas férias'};
+function nomesDesc(k){return S.desc.filter(d=>d.ativo!==false&&+d.valor>0&&(d.aplicaEm===k||d.aplicaEm==='ambos'||!d.aplicaEm)).map(d=>d.nome).join(', ')}
+function vDescontos(){
+  const dis=S.canWrite?'':'disabled',lista=[...S.desc].sort((a,b)=>String(a.nome).localeCompare(b.nome));
+  return `<div class="panel">
+    <div class="ph"><h2>Outros descontos</h2><button class="btn primary sm" data-act="novoDesc" ${dis}>+ Desconto</button></div>
+    ${lista.length?`<div class="tw"><table><thead><tr><th>Desconto</th><th>Desconta de</th><th class="num">Valor</th><th></th></tr></thead><tbody>
+    ${lista.map(d=>`<tr style="${d.ativo===false?'opacity:.55':''}"><td><b>${esc(d.nome)}</b>${d.ativo===false?'<span class="tag">pausado</span>':''}${d.obs?`<div class="muted">${esc(d.obs)}</div>`:''}</td><td>${APLICA[d.aplicaEm]||APLICA.ambos}</td><td class="num"><b>${brl(d.valor)}</b></td><td class="acts">${acts('Desc',d.id)}</td></tr>`).join('')}
+    </tbody></table></div>`:`<div class="empty"><b>Nenhum desconto cadastrado</b>Cadastre o que sai do seu 13º ou das suas férias além de INSS e IR, como plano de saúde, empréstimo consignado ou pensão. O líquido acima e o resumo da Visão geral passam a descontar esses valores.</div>`}
+  </div>`;
 }
 
 const dia5=s=>!!s&&s.slice(8,10)==='05';
@@ -538,12 +562,29 @@ function resumoAno(y){
   const decPj=temPj?pj.dec:0,ferPj=temPj?pj.fer:0,decClt=temClt?clt.l13.liq:0,ferClt=temClt?clt.lFer.liq:0;
   return{pj,clt,temPj,temClt,decPj,ferPj,decClt,ferClt,dec:decPj+decClt,fer:ferPj+ferClt,tot:decPj+decClt+ferPj+ferClt};
 }
+// o que ainda falta pagar até 31/12: impostos e contas em aberto + os dos meses que ainda não foram gerados
+function previsaoPagamentos(y){
+  const fim=iso(y,12,31),itens=[];
+  S.obrig.filter(o=>o.status!=='pago'&&o.vencimento<=fim).forEach(o=>itens.push({d:o.vencimento,n:o.nome,v:+o.valor||0,k:'obrigação',est:!!o.calculado}));
+  S.lanc.filter(l=>l.tipo==='saida'&&l.status==='pendente'&&l.data<=fim).forEach(l=>itens.push({d:l.data,n:l.descricao,v:+l.valor||0,k:l.origem==='fixa'?'conta fixa':'conta'}));
+  const agora=new Date(),ay=agora.getFullYear();
+  for(let m=y===ay?agora.getMonth()+1:y>ay?1:13;m<=12;m++){
+    modelosDoMes(y,m).filter(x=>!S.obrig.some(o=>o.id===x.id)).forEach(x=>itens.push({d:x.vencimento,n:x.nome,v:+x.valor||0,k:'obrigação',est:true}));
+    fixasDoMes(y,m).filter(x=>!S.lanc.some(l=>l.id===x.id)).forEach(x=>itens.push({d:x.data,n:x.descricao,v:+x.valor||0,k:'conta fixa'}));
+  }
+  itens.sort((a,b)=>a.d.localeCompare(b.d));
+  return{itens,total:itens.reduce((a,i)=>a+i.v,0),semValor:itens.filter(i=>!i.v).length};
+}
 function vResumoAno(){
   const y=S.ref.y,r=resumoAno(y);
   if(!r.temPj&&!r.temClt)return `<div class="panel"><div class="ph"><h2>Seu fim de ano ${y}</h2></div><p class="note" style="margin:0">Lance os recebimentos da PJ em “13º e férias PJ” e os salários em “CLT (pessoa física)” para ver aqui quanto você vai receber de 13º e de férias.</p></div>`;
   const linha=(rot,v,sub)=>`<div class="rl"><span>${rot}${sub?`<small>${sub}</small>`:''}</span><b>${brl(v)}</b></div>`;
   const partes=(pj,clt)=>[r.temPj?`${brl(pj)} da PJ`:'',r.temClt?`${brl(clt)} líquidos da CLT`:''].filter(Boolean).join(' + ');
-  const frase=`Em ${y}, você vai receber <b>${brl(r.dec)}</b> de 13º (${partes(r.decPj,r.decClt)}) e <b>${brl(r.fer)}</b> de férias com o 1/3 (${partes(r.ferPj,r.ferClt)}). Somando tudo, são <b>${brl(r.tot)}</b>.`;
+  const pg=previsaoPagamentos(y);
+  const frase=`Em ${y}, você vai receber <b>${brl(r.dec)}</b> de 13º (${partes(r.decPj,r.decClt)}) e <b>${brl(r.fer)}</b> de férias com o 1/3 (${partes(r.ferPj,r.ferClt)}). Somando tudo, são <b>${brl(r.tot)}</b>.${pg.itens.length?` Até 31/12 você ainda tem <b>${brl(pg.total)}</b> para pagar em impostos e contas${pg.semValor?`, fora ${pg.semValor} ${pg.semValor===1?'item':'itens'} ainda sem valor`:''}.`:''}`;
+  const blocoPg=pg.itens.length?`<div class="rcol full"><h3>O que você vai pagar até dezembro</h3>
+      ${pg.itens.map(i=>`<div class="rp"><time>${fmtD(i.d).slice(0,5)}</time><span>${esc(i.n)}<small>${i.k}${i.est?' · estimado':''}${i.d<hoje()?' · vencido':''}</small></span><b>${i.v?brl(i.v):'<small>a definir</small>'}</b></div>`).join('')}
+      <div class="rl tot"><span>Total a pagar</span><b>${brl(pg.total)}</b></div></div>`:'';
   const subPj=r.temPj?`média de ${r.pj.n} ${r.pj.n===1?'mês':'meses'}, sem desconto`:'sem recebimentos lançados';
   return `<section class="resumo" aria-label="Resumo de 13º e férias de ${y}">
     <div class="rh"><div><span class="spaced">Seu fim de ano</span><h2>O que você vai receber em ${y}</h2></div><div class="rt"><small>Total</small><b>${brl(r.tot)}</b></div></div>
@@ -557,6 +598,7 @@ function vResumoAno(){
         ${linha('PJ',r.ferPj,subPj)}
         ${linha('CLT',r.ferClt,r.temClt?`líquido · bruto ${brl(r.clt.fer)}`:'sem salários lançados')}
         <div class="rl tot"><span>Total de férias</span><b>${brl(r.fer)}</b></div></div>
+      ${blocoPg}
     </div>
     <div class="rfoot"><button class="btn ghost sm" data-go="beneficios">Ver PJ</button><button class="btn ghost sm" data-go="clt">Ver CLT</button>
       <span>${r.temClt?`13º da CLT: 1ª parcela de ${brl(r.clt.parc1)} até 30/11 e 2ª de ${brl(r.clt.parc2)} até 20/12. `:''}A CLT já vem com INSS e IR descontados; a PJ não tem desconto.</span></div>
@@ -829,6 +871,12 @@ const F={
     {k:'status',l:'Situação',type:'select',opts:[['pendente','A pagar'],['pago','Pago']]},
     {k:'pagoEm',l:'Pago em',type:'date'},
     {k:'obs',l:'Observação',type:'text',full:1,ph:'Ex.: código de barras, nº do DARF'}]},
+  desconto:{t:'desconto',col:'descontos',f:[
+    {k:'nome',l:'Desconto',type:'list',req:1,full:1,list:()=>['Plano de saúde','Plano odontológico','Empréstimo consignado','Pensão alimentícia','Previdência privada','Seguro de vida','Coparticipação do plano'],ph:'Ex.: Plano de saúde'},
+    {k:'valor',l:'Valor (R$)',type:'money',req:1},
+    {k:'aplicaEm',l:'Desconta de',type:'select',opts:[['ambos','13º e férias'],['13','Só do 13º'],['ferias','Só das férias']]},
+    {k:'obs',l:'Observação',type:'text',full:1,ph:'Ex.: parcela 8 de 24'},
+    {k:'ativo',l:'Ativo',type:'check'}]},
   fixa:{t:'conta fixa',col:'modelos',f:[
     {k:'nome',l:'Nome da conta',type:'text',req:1,full:1,ph:'Ex.: Escritório virtual'},
     {k:'valorPadrao',l:'Valor (R$)',type:'money',req:1},
@@ -906,7 +954,7 @@ function msgErr(x){if(x)console.error(x);const c=x&&x.code;if(c==='42501'){S.can
 const SB_URL='https://qqqvoyqdmhicolyklswb.supabase.co';
 const SB_KEY='sb_publishable_j43C2RbszxXFvkS12aopQw_hw2M5aEp';
 const sb=window.supabase?window.supabase.createClient(SB_URL,SB_KEY):null;
-const KEY={lancamentos:'lanc',notas:'notas',obrigacoes:'obrig',modelos:'modelos'};
+const KEY={lancamentos:'lanc',notas:'notas',obrigacoes:'obrig',modelos:'modelos',descontos:'desc'};
 const snake=k=>k.replace(/[A-Z]/g,c=>'_'+c.toLowerCase());
 const camel=k=>k.replace(/_([a-z])/g,(_,c)=>c.toUpperCase());
 function toRow(col,obj){const r={};for(const[k,v]of Object.entries(obj)){if(v===undefined)continue;if(col==='beneficios'&&k==='id')continue;r[snake(k)]=v===''?null:v}return r}
@@ -975,6 +1023,8 @@ async function act(a,id,btn){
     case'novoModelo':return openForm('modelo',null,{periodicidade:'mensal',dia:20,ajuste:'proximo',calculo:'fixo',ativo:true,ordem:S.modelos.length+1});
     case'novaFixa':return openForm('fixa',null,{periodicidade:'mensal',dia:10,ajuste:'proximo',categoria:'Aluguel e coworking',ativo:true});
     case'editFixa':return openForm('fixa',M);
+    case'novoDesc':return openForm('desconto',null,{aplicaEm:'ambos',ativo:true});
+    case'editDesc':return openForm('desconto',S.desc.find(x=>x.id===id));
     case'gerarFixas':{const novos=fixasDoMes(S.ref.y,S.ref.m).filter(x=>!S.lanc.some(l=>l.id===x.id));for(const x of novos){const d={...x};delete d.id;await put('lancamentos',x.id,d)}return toast(`${novos.length} conta${novos.length===1?' fixa criada':'s fixas criadas'} como saída a pagar`)}
     case'editModelo':return openForm('modelo',M);
     case'config':return openForm('config',S.config);
@@ -997,6 +1047,7 @@ async function act(a,id,btn){
     if(a==='delNota'){await del('notas',id);if(S.lanc.some(l=>l.id==='nf-'+id))await del('lancamentos','nf-'+id);await atualizarDas()}
     if(a==='delOb'){await del('obrigacoes',id);if(S.lanc.some(l=>l.id==='ob-'+id))await del('lancamentos','ob-'+id)}
     if(a==='delModelo'||a==='delFixa')await del('modelos',id);
+    if(a==='delDesc')await del('descontos',id);
     toast('Excluído');
   }
   }catch(x){toast(msgErr(x))}
@@ -1039,11 +1090,12 @@ document.getElementById('mHoje').onclick=()=>{const d=new Date();S.ref={y:d.getF
 /* ---------- dados ---------- */
 let renderQ=0;const later=()=>{cancelAnimationFrame(renderQ);renderQ=requestAnimationFrame(render)};
 async function carregar(){
-  const tabelas=['lancamentos','notas','obrigacoes','modelos','beneficios','config','clt_salarios'];
+  const tabelas=['lancamentos','notas','obrigacoes','modelos','beneficios','config','clt_salarios','descontos'];
   const res=await Promise.all(tabelas.map(t=>sb.from(t).select('*'))).catch(e=>[{error:e}]);
   const falha=res.find(r=>r.error);
   if(falha){console.error(falha.error);S.offline=true;render();return}
-  const[l,n,o,m,b,c,cl]=res.map(r=>r.data);
+  const[l,n,o,m,b,c,cl,ds]=res.map(r=>r.data);
+  S.desc=ds.map(fromRow);
   S.clt=Object.fromEntries(cl.map(r=>[r.id,+r.valor||0]));
   S.lanc=l.map(fromRow);S.notas=n.map(fromRow);S.obrig=o.map(fromRow);S.modelos=m.map(fromRow);
   S.benef=Object.fromEntries(b.map(r=>[String(r.ano),{meses:r.meses||{}}]));
@@ -1078,7 +1130,7 @@ async function entrou(session){
   if(ok)await carregar();else render();
 }
 function pedirLogin(){
-  S.db=null;S.lanc=[];S.notas=[];S.obrig=[];S.modelos=[];S.benef={};S.clt={};S.semAcesso=false;
+  S.db=null;S.lanc=[];S.notas=[];S.obrig=[];S.modelos=[];S.benef={};S.clt={};S.desc=[];S.semAcesso=false;
   document.getElementById('btnSair').hidden=true;
   document.getElementById('login').hidden=false;
   render();setTimeout(()=>document.getElementById('lgEmail').focus(),30);

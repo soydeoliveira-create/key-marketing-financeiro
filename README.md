@@ -27,7 +27,7 @@ select id, email from auth.users where email = 'email-da-pessoa@exemplo.com';
 
 ## Tabelas
 
-`lancamentos`, `notas`, `obrigacoes`, `modelos` (obrigações recorrentes), `beneficios` (valores do 13º da PJ por ano), `clt_salarios` (salário bruto CLT por mês, pessoa física), `config` (alíquota do DAS, início da PJ, dados da CLT) e `membros`.
+`lancamentos`, `notas`, `obrigacoes`, `modelos` (obrigações recorrentes), `beneficios` (valores do 13º da PJ por ano), `clt_salarios` (salário bruto CLT por mês, pessoa física), `descontos` (outros descontos da CLT, como plano de saúde e empréstimo), `config` (alíquota do DAS, início da PJ, dados da CLT) e `membros`.
 
 ## Regras de cálculo
 
