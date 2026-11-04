@@ -419,9 +419,8 @@ function cltCalc(y){
   const dec=n?soma/n:0,terco=dec/3,fer=dec+terco;
   const deps=+S.config.cltDependentes||0;
   // outros descontos cadastrados (plano de saúde, empréstimo…) saem do líquido
-  const ativos=S.desc.filter(d=>d.ativo!==false&&+d.valor>0);
-  const soma_=k=>r2(ativos.filter(d=>d.aplicaEm===k||d.aplicaEm==='ambos'||!d.aplicaEm).reduce((a,d)=>a+(+d.valor||0),0));
-  const o13=soma_('13'),oFer=soma_('ferias');
+  // o 13º é pago em dezembro: vale o desconto ativo em dezembro; nas férias, o que estiver ativo no mês escolhido no topo
+  const o13=descontosDe('13',ym(y,12)),oFer=descontosDe('ferias',refYM());
   const b13=liquido(dec,deps,false),bFer=liquido(fer,deps,true);
   const l13={...b13,outros:o13,liq:r2(b13.liq-o13)},lFer={...bFer,outros:oFer,liq:r2(bFer.liq-oFer)};
   return{adm,ini,vals,n,soma,dec,terco,fer,total:dec+fer,deps,l13,lFer,parc1:r2(dec/2),parc2:r2(l13.liq-dec/2)};
@@ -432,8 +431,11 @@ function vClt(){
   if(!c)return `<div class="panel"><div class="empty"><b>CLT (pessoa física)</b>Aqui você lança seus salários CLT, separados da PJ. Informe primeiro a data de admissão.<div style="margin-top:14px"><button class="btn primary" data-act="cltDados" ${dis}>Informar data de admissão</button></div></div></div>`;
   const possiveis=Math.max(0,13-c.ini);
   const rows=MESES.map((m,i)=>{const k=ym(y,i+1),v=c.vals[i];
-    if(i+1<c.ini)return `<tr class="zero"><td style="text-transform:capitalize">${m}</td><td class="num"><span class="muted">antes da admissão</span></td></tr>`;
-    return `<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td><td class="num"><input id="clt-${k}" data-clt="${k}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Salário bruto de ${m}" ${dis}></td></tr>`}).join('');
+    if(i+1<c.ini)return `<tr class="zero"><td style="text-transform:capitalize">${m}</td><td class="num"><span class="muted">antes da admissão</span></td><td></td></tr>`;
+    const lq=v?salarioLiquido(k):null;
+    return `<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td><td class="num"><input id="clt-${k}" data-clt="${k}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Salário bruto de ${m}" ${dis}></td>
+      <td class="num">${lq?`<b>${brl(lq.liq)}</b>${lq.outros?`<div class="muted">− ${brl(lq.outros)} de descontos</div>`:''}`:'<span class="muted">—</span>'}</td></tr>`}).join('');
+  const liqAno=MESES.reduce((a,_,i)=>{const k=ym(y,i+1);return a+(i+1>=c.ini&&S.clt[k]>0?salarioLiquido(k).liq:0)},0);
   return `
   <div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Área da <b>pessoa física</b>: nada daqui entra nas entradas, saídas ou no 13º da PJ. Admissão em ${fmtD(c.adm)}.</span><button class="btn ghost sm" data-act="cltDados" ${dis}>Admissão e dependentes</button></div>
   <section class="kpis">
@@ -445,8 +447,8 @@ function vClt(){
   <section class="grid2">
   <div class="panel">
     <div class="ph"><h2>Salários CLT de ${y}</h2><span class="hint">valor bruto do holerite</span></div>
-    <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Salário bruto</th></tr></thead><tbody>${rows}</tbody>
-    <tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td></tr></tfoot></table></div>
+    <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Salário bruto</th><th class="num">Líquido</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td><td class="num">${brl(liqAno)}</td></tr></tfoot></table></div>
     <p class="note" style="margin:12px 0 0">Lance o <b>total de vencimentos</b> do holerite, antes dos descontos de INSS e IR. Mês em branco não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
   </div>
   <div class="panel">
@@ -467,7 +469,7 @@ function vClt(){
       <div><span>13º bruto</span><b>${brl(c.l13.bruto)}</b></div>
       <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(c.l13.inss)}</b></div>
       <div><span>− Imposto de Renda<span class="op">${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(c.l13.ir)}</b></div>
-      ${c.l13.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('13'))}</span></span><b class="neg">${brl(c.l13.outros)}</b></div>`:''}
+      ${c.l13.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('13',ym(y,12)))}</span></span><b class="neg">${brl(c.l13.outros)}</b></div>`:''}
       <div><span><b>13º líquido</b></span><span class="big">${brl(c.l13.liq)}</span></div>
       <div><span>1ª parcela, até 30/11<span class="op">metade do bruto, sem desconto</span></span><b>${brl(c.parc1)}</b></div>
       <div><span>2ª parcela, até 20/12<span class="op">líquido − 1ª parcela</span></span><b>${brl(c.parc2)}</b></div>
@@ -479,22 +481,53 @@ function vClt(){
       <div><span>Férias + 1/3 bruto</span><b>${brl(c.lFer.bruto)}</b></div>
       <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(c.lFer.inss)}</b></div>
       <div><span>− Imposto de Renda<span class="op">${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(c.lFer.ir)}</b></div>
-      ${c.lFer.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('ferias'))}</span></span><b class="neg">${brl(c.lFer.outros)}</b></div>`:''}
+      ${c.lFer.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('ferias',refYM()))}</span></span><b class="neg">${brl(c.lFer.outros)}</b></div>`:''}
       <div><span><b>Férias líquido</b></span><span class="big pos">${brl(c.lFer.liq)}</span></div>
     </div>
     <p class="note" style="margin:12px 0 0">Estimativa com as tabelas de 2026. O holerite da empresa é o valor oficial: o INSS das férias pode sair diferente, porque a empresa soma as férias ao salário do mês. ${c.deps?'':'Se você tem dependentes no IR, informe em “Admissão e dependentes”.'}</p>
   </div></section>
-  ${vDescontos()}`;
+  <section class="grid2">${vSalario()}${vDescontos()}</section>`;
 }
-const APLICA={ambos:'13º e férias','13':'Só no 13º',ferias:'Só nas férias'};
-function nomesDesc(k){return S.desc.filter(d=>d.ativo!==false&&+d.valor>0&&(d.aplicaEm===k||d.aplicaEm==='ambos'||!d.aplicaEm)).map(d=>d.nome).join(', ')}
+const APLICA={salario:'Salário (todo mês)',ambos:'13º e férias','13':'Só no 13º',ferias:'Só nas férias'};
+// salário do mês escolhido no topo (ou o último lançado antes dele), do bruto ao líquido
+function salarioMes(){
+  const k=refYM(),meses=Object.keys(S.clt).filter(m=>S.clt[m]>0&&m<=k).sort();
+  if(!meses.length)return null;
+  const mes=S.clt[k]>0?k:meses[meses.length-1];
+  return{mes,...salarioLiquido(mes)};
+}
+// desconto vale num mês se estiver ativo e o mês estiver entre o início e o fim dele
+const descontoNoMes=(d,m)=>d.ativo!==false&&+d.valor>0&&(!d.mesInicio||m>=d.mesInicio)&&(!d.mesFim||m<=d.mesFim);
+const tipoDesc=(d,k)=>k==='salario'?d.aplicaEm==='salario':(d.aplicaEm===k||d.aplicaEm==='ambos'||!d.aplicaEm);
+function descontosDe(k,m){return r2(S.desc.filter(d=>tipoDesc(d,k)&&descontoNoMes(d,m)).reduce((a,d)=>a+(+d.valor||0),0))}
+function salarioLiquido(m){
+  const deps=+S.config.cltDependentes||0,base=liquido(S.clt[m]||0,deps,true),outros=descontosDe('salario',m);
+  return{deps,...base,outros,liq:r2(base.liq-outros)};
+}
+function vSalario(){
+  const s=salarioMes();
+  if(!s)return `<div class="panel"><div class="ph"><h2>Salário do mês</h2></div><div class="empty">Lance o salário bruto de um mês para ver quanto cai na conta.</div></div>`;
+  const nm=MESES[+s.mes.slice(5)-1];
+  return `<div class="panel">
+    <div class="ph"><h2>Salário de ${nm}: do bruto ao líquido</h2>${s.mes!==refYM()?`<span class="hint">último lançado</span>`:''}</div>
+    <div class="calc">
+      <div><span>Salário bruto</span><b>${brl(s.bruto)}</b></div>
+      <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(s.inss)}</b></div>
+      <div><span>− Imposto de Renda<span class="op">${s.deps?`${s.deps} dependente${s.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(s.ir)}</b></div>
+      ${s.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('salario',s.mes))}</span></span><b class="neg">${brl(s.outros)}</b></div>`:''}
+      <div><span><b>Salário líquido</b><span class="op">estimativa do que cai na conta</span></span><span class="big pos">${brl(s.liq)}</span></div>
+    </div>
+  </div>`;
+}
+function nomesDesc(k,m){return S.desc.filter(d=>tipoDesc(d,k)&&descontoNoMes(d,m)).map(d=>d.nome).join(', ')}
+const periodoDesc=d=>d.mesInicio&&d.mesFim?`${fmtYM(d.mesInicio)} a ${fmtYM(d.mesFim)}`:d.mesInicio?`desde ${fmtYM(d.mesInicio)}, sem fim`:d.mesFim?`até ${fmtYM(d.mesFim)}`:'todo mês, sem fim';
 function vDescontos(){
   const dis=S.canWrite?'':'disabled',lista=[...S.desc].sort((a,b)=>String(a.nome).localeCompare(b.nome));
   return `<div class="panel">
     <div class="ph"><h2>Outros descontos</h2><button class="btn primary sm" data-act="novoDesc" ${dis}>+ Desconto</button></div>
-    ${lista.length?`<div class="tw"><table><thead><tr><th>Desconto</th><th>Desconta de</th><th class="num">Valor</th><th></th></tr></thead><tbody>
-    ${lista.map(d=>`<tr style="${d.ativo===false?'opacity:.55':''}"><td><b>${esc(d.nome)}</b>${d.ativo===false?'<span class="tag">pausado</span>':''}${d.obs?`<div class="muted">${esc(d.obs)}</div>`:''}</td><td>${APLICA[d.aplicaEm]||APLICA.ambos}</td><td class="num"><b>${brl(d.valor)}</b></td><td class="acts">${acts('Desc',d.id)}</td></tr>`).join('')}
-    </tbody></table></div>`:`<div class="empty"><b>Nenhum desconto cadastrado</b>Cadastre o que sai do seu 13º ou das suas férias além de INSS e IR, como plano de saúde, empréstimo consignado ou pensão. O líquido acima e o resumo da Visão geral passam a descontar esses valores.</div>`}
+    ${lista.length?`<div class="tw"><table><thead><tr><th>Desconto</th><th>Desconta de</th><th>Período</th><th class="num">Valor</th><th></th></tr></thead><tbody>
+    ${lista.map(d=>`<tr style="${d.ativo===false?'opacity:.55':''}"><td><b>${esc(d.nome)}</b>${d.ativo===false?'<span class="tag">pausado</span>':''}${d.obs?`<div class="muted">${esc(d.obs)}</div>`:''}</td><td>${APLICA[d.aplicaEm]||APLICA.ambos}</td><td><span class="muted">${periodoDesc(d)}</span></td><td class="num"><b>${brl(d.valor)}</b></td><td class="acts">${acts('Desc',d.id)}</td></tr>`).join('')}
+    </tbody></table></div>`:`<div class="empty"><b>Nenhum desconto cadastrado</b>Cadastre o que sai do seu salário, do 13º ou das férias além de INSS e IR, como plano de saúde, empréstimo consignado ou pensão. Cada desconto entra só onde você escolher.</div>`}
   </div>`;
 }
 
@@ -874,7 +907,9 @@ const F={
   desconto:{t:'desconto',col:'descontos',f:[
     {k:'nome',l:'Desconto',type:'list',req:1,full:1,list:()=>['Plano de saúde','Plano odontológico','Empréstimo consignado','Pensão alimentícia','Previdência privada','Seguro de vida','Coparticipação do plano'],ph:'Ex.: Plano de saúde'},
     {k:'valor',l:'Valor (R$)',type:'money',req:1},
-    {k:'aplicaEm',l:'Desconta de',type:'select',opts:[['ambos','13º e férias'],['13','Só do 13º'],['ferias','Só das férias']]},
+    {k:'aplicaEm',l:'Desconta de',type:'select',opts:[['salario','Do salário (todo mês)'],['ambos','Do 13º e das férias'],['13','Só do 13º'],['ferias','Só das férias']]},
+    {k:'mesInicio',l:'Começa em',type:'month',req:1,help:'Primeiro mês descontado'},
+    {k:'mesFim',l:'Termina em',type:'month',help:'Em branco = sem data para acabar'},
     {k:'obs',l:'Observação',type:'text',full:1,ph:'Ex.: parcela 8 de 24'},
     {k:'ativo',l:'Ativo',type:'check'}]},
   fixa:{t:'conta fixa',col:'modelos',f:[
@@ -1023,7 +1058,7 @@ async function act(a,id,btn){
     case'novoModelo':return openForm('modelo',null,{periodicidade:'mensal',dia:20,ajuste:'proximo',calculo:'fixo',ativo:true,ordem:S.modelos.length+1});
     case'novaFixa':return openForm('fixa',null,{periodicidade:'mensal',dia:10,ajuste:'proximo',categoria:'Aluguel e coworking',ativo:true});
     case'editFixa':return openForm('fixa',M);
-    case'novoDesc':return openForm('desconto',null,{aplicaEm:'ambos',ativo:true});
+    case'novoDesc':return openForm('desconto',null,{aplicaEm:'salario',ativo:true,mesInicio:refYM()});
     case'editDesc':return openForm('desconto',S.desc.find(x=>x.id===id));
     case'gerarFixas':{const novos=fixasDoMes(S.ref.y,S.ref.m).filter(x=>!S.lanc.some(l=>l.id===x.id));for(const x of novos){const d={...x};delete d.id;await put('lancamentos',x.id,d)}return toast(`${novos.length} conta${novos.length===1?' fixa criada':'s fixas criadas'} como saída a pagar`)}
     case'editModelo':return openForm('modelo',M);
