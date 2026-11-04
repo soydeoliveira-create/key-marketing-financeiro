@@ -63,6 +63,8 @@ header.top{padding-block:22px 0}
 .brand .ini{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--hero-bg);color:var(--hero-fg);font-weight:800;font-size:18px;flex:none}
 .brand .cnpj{display:block;font-size:12px;color:var(--ink-3);margin-top:3px}
 .brand b.nome{text-transform:none}
+footer.sist{padding-block:0 28px;margin-top:-40px;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-3);text-align:center}
+.login .sist{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-3);text-align:center;margin:0}
 .month{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px}
 .month button{border:0;background:transparent;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;color:var(--ink-2)}
 .month button:hover{background:var(--surface-2);color:var(--ink)}
@@ -291,6 +293,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
 </header>
 <main class="wrap" id="app"><div class="empty"><b>Carregando o AIME Financy…</b>Buscando lançamentos, notas e obrigações.</div></main>
 
+<footer class="wrap sist">AIME Financy</footer>
+
 <div class="login" id="login" hidden>
   <div class="box">
     <div class="brand" id="marcaLogin"></div>
@@ -303,6 +307,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
       <button class="btn primary" type="submit" id="lgBtn">Entrar</button>
       <button class="troca" type="button" id="lgTroca">Primeiro acesso? Criar minha conta</button>
     </form>
+    <p class="sist">AIME Financy</p>
   </div>
 </div>
 
@@ -382,10 +387,11 @@ function marcaAtual(){
 function aplicarMarca(){
   const m=marcaAtual(),key=m.logo==='key';
   const iniciais=(m.nome||'F').split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase();
-  const html=key?`${KEY_SVG}<div><b>key marketing</b><span class="spaced">AIME Financy</span></div>`
-    :`${m.logo?`<img src="${esc(m.logo)}" alt="">`:`<span class="ini" aria-hidden="true">${esc(iniciais)}</span>`}<div><b class="nome">${esc(m.nome||'Sua empresa')}</b><span class="spaced">AIME Financy</span>${m.cnpj?`<span class="cnpj">CNPJ ${esc(m.cnpj)}</span>`:''}</div>`;
+  // o nome da empresa é o que cada conta cadastrar; AIME Financy é o nome do sistema
+  const nome=m.nome||(key?'key marketing':'');
+  const html=`${key?KEY_SVG:m.logo?`<img src="${esc(m.logo)}" alt="">`:`<span class="ini" aria-hidden="true">${esc(iniciais)}</span>`}<div><b class="nome">${esc(nome||'Sua empresa')}</b><span class="spaced">Financeiro</span>${m.cnpj&&!key?`<span class="cnpj">CNPJ ${esc(m.cnpj)}</span>`:''}</div>`;
   for(const id of['marca','marcaLogin']){const el=document.getElementById(id);if(el&&el.dataset.h!==html){el.innerHTML=html;el.dataset.h=html}}
-  document.title=key?'AIME Financy · Key Marketing':m.nome?`AIME Financy · ${m.nome}`:'AIME Financy';
+  document.title=nome?`${nome} · AIME Financy`:'AIME Financy';
   const st=document.documentElement.style;
   if(!key&&COR.test(m.c2||'')){st.setProperty('--pink',m.c2);st.setProperty('--pink-ink',`color-mix(in srgb,${m.c2} 78%,var(--ink))`);st.setProperty('--pink-soft',`color-mix(in srgb,${m.c2} 16%,var(--surface))`);st.setProperty('--hero-accent',`color-mix(in srgb,${m.c2} 70%,#fff)`)}
   else ['--pink','--pink-ink','--pink-soft','--hero-accent'].forEach(p=>st.removeProperty(p));
@@ -1055,7 +1061,7 @@ const F={
   marca:{t:'dados da empresa',f:[
     {k:'empresaNome',l:'Nome da empresa',type:'text',req:1,full:1,ph:'Nome da sua empresa'},
     {k:'cnpj',l:'CNPJ',type:'text',full:1,ph:'00.000.000/0001-00'},
-    {k:'logo',l:'Logo',type:'logo',full:1,help:'PNG, JPG ou SVG. Em branco mantém o logo atual.'},
+    {k:'logo',l:'Logo',type:'logo',full:1,help:'PNG, JPG ou SVG. Em branco mantém o logo atual. As cores só valem com logo próprio.'},
     {k:'corPrincipal',l:'Cor principal',type:'color',help:'Faixa do resumo e destaques escuros'},
     {k:'corDestaque',l:'Cor de destaque',type:'color',help:'Botões e abas'}]},
   inicio:{t:'início da PJ',f:[
