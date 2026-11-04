@@ -19,6 +19,8 @@ A chave que aparece no `index.html` é a chave **pública** do Supabase. Ela soz
 - Qualquer pessoa pode criar a própria conta em "Primeiro acesso? Criar minha conta".
 - **Cada conta tem o seu próprio financeiro.** Toda tabela tem a coluna `dono` (o usuário que criou a linha), e as regras de acesso (RLS) só deixam cada conta ler e alterar as próprias linhas. Uma conta não vê nada das outras.
 - A chave de cada tabela é `(dono, id)` (em `beneficios`, `(dono, ano)`), então duas contas podem ter, por exemplo, o mesmo `das-2026-11`.
+- **Marca de cada conta:** botão "Empresa" no topo (nome, CNPJ, logo e duas cores), guardado em `config` (`empresa_nome`, `cnpj`, `logo` como imagem pequena em data URL, `cor_principal`, `cor_destaque`). `logo = 'key'` usa o logo da Key. A tela de login mostra a última marca usada no navegador.
+- **Funcionários:** tabela `funcionarios` (nome, cargo, CPF, regime CLT ou PJ, admissão, dependentes, `eu`). `clt_salarios` e `descontos` têm a coluna `funcionario`; a chave de `clt_salarios` é `(dono, funcionario, id)`. O funcionário com `eu = true` entra no quadro "Seu fim de ano".
 - Conta nova já começa com a configuração (alíquota 6%) e com DAS e DEFIS cadastrados. Isso é feito pela função `primeiro_membro`, no gatilho `ao_criar_usuario`.
 
 ## Tabelas

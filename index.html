@@ -58,6 +58,11 @@ header.top{padding-block:22px 0}
 .brand b{display:block;font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1}
 .spaced{font-size:11px;letter-spacing:.42em;text-transform:uppercase;color:var(--pink-ink);font-weight:500}
 .brand .spaced{display:block;margin-top:6px}
+.brand img{height:44px;width:auto;max-width:140px;object-fit:contain;flex:none}
+.login .brand img{height:52px}
+.brand .ini{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--hero-bg);color:var(--hero-fg);font-weight:800;font-size:18px;flex:none}
+.brand .cnpj{display:block;font-size:12px;color:var(--ink-3);margin-top:3px}
+.brand b.nome{text-transform:none}
 .month{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px}
 .month button{border:0;background:transparent;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;color:var(--ink-2)}
 .month button:hover{background:var(--surface-2);color:var(--ink)}
@@ -261,10 +266,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
 <header class="top">
   <div class="wrap">
     <div class="brandrow">
-      <div class="brand">
-        <svg viewBox="0 0 340 330" aria-hidden="true"><rect x="0" y="0" width="56" height="320" fill="currentColor"/><path d="M56 132 L228 22 L262 72 L120 166 Z" fill="currentColor"/><path d="M56 186 L120 166 L250 252 L232 302 Z" fill="currentColor"/><circle cx="288" cy="48" r="48" fill="#E8628F"/><rect x="240" y="224" width="96" height="96" rx="10" fill="#1F6E78"/></svg>
-        <div><b>key marketing</b><span class="spaced">Financeiro</span></div>
-      </div>
+      <div class="brand" id="marca"></div>
       <div class="toprt">
       <div class="month" role="group" aria-label="Mês de referência">
         <button id="mPrev" aria-label="Mês anterior">‹</button>
@@ -272,6 +274,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
         <button id="mNext" aria-label="Próximo mês">›</button>
         <button id="mHoje" class="hoje">Hoje</button>
       </div>
+      <button id="btnMarca" class="sair" data-act="marca" hidden>Empresa</button>
       <button id="btnSair" class="sair" hidden>Sair</button>
       </div>
     </div>
@@ -282,7 +285,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
       <button role="tab" data-v="impostos">Impostos e obrigações</button>
       <button role="tab" data-v="cal">Calendário</button>
       <button role="tab" data-v="beneficios">13º e férias PJ</button>
-      <button role="tab" data-v="clt">CLT (pessoa física)</button>
+      <button role="tab" data-v="clt">Funcionários</button>
     </nav>
   </div>
 </header>
@@ -290,10 +293,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
 
 <div class="login" id="login" hidden>
   <div class="box">
-    <div class="brand">
-      <svg viewBox="0 0 340 330" aria-hidden="true"><rect x="0" y="0" width="56" height="320" fill="currentColor"/><path d="M56 132 L228 22 L262 72 L120 166 Z" fill="currentColor"/><path d="M56 186 L120 166 L250 252 L232 302 Z" fill="currentColor"/><circle cx="288" cy="48" r="48" fill="#E8628F"/><rect x="240" y="224" width="96" height="96" rx="10" fill="#1F6E78"/></svg>
-      <div><b>key marketing</b><span class="spaced">Financeiro</span></div>
-    </div>
+    <div class="brand" id="marcaLogin"></div>
     <form id="loginForm" novalidate>
       <h1 id="loginTitulo">Entrar no financeiro</h1>
       <p id="loginSub">Use o e-mail e a senha da sua conta.</p>
@@ -347,7 +347,7 @@ const CAT_IN=['Serviços prestados','Gestão de redes sociais','Tráfego pago (g
 const CAT_OUT=['Impostos e taxas','Pró-labore','Mídia paga (anúncios)','Ferramentas e softwares','Freelancers e fornecedores','Contabilidade','Aluguel e coworking','Internet e telefone','Tarifas bancárias','Equipamentos','Outras saídas'];
 
 const now=new Date();
-const S={lanc:[],notas:[],obrig:[],modelos:[],benef:{},clt:{},desc:[],config:{aliquota:6},ref:{y:now.getFullYear(),m:now.getMonth()+1},view:'geral',dia:null,lancTipo:'todos',db:null,canWrite:true,loaded:0,offline:false};
+const S={lanc:[],notas:[],obrig:[],modelos:[],benef:{},clt:{},desc:[],func:[],funcSel:null,config:{aliquota:6},ref:{y:now.getFullYear(),m:now.getMonth()+1},view:'geral',dia:null,lancTipo:'todos',db:null,canWrite:true,loaded:0,offline:false};
 try{const v=localStorage.getItem('km-view');if(v)S.view=v}catch(e){}
 const h=location.hash.replace('#','');if(['geral','lanc','notas','impostos','cal','beneficios','clt'].includes(h))S.view=h;
 
@@ -371,8 +371,32 @@ function totais(k){
 function faturado(k){return S.notas.filter(n=>n.status!=='cancelada'&&inMonth(n.dataEmissao,k)).reduce((a,n)=>a+(+n.valor||0),0)}
 function rbt12(){let t=0;for(let i=1;i<=12;i++){const p=addM(S.ref.y,S.ref.m,-i);t+=faturado(ym(p.y,p.m))}return t}
 
+/* ---------- marca de cada conta ---------- */
+const KEY_SVG='<svg viewBox="0 0 340 330" aria-hidden="true"><rect x="0" y="0" width="56" height="320" fill="currentColor"/><path d="M56 132 L228 22 L262 72 L120 166 Z" fill="currentColor"/><path d="M56 186 L120 166 L250 252 L232 302 Z" fill="currentColor"/><circle cx="288" cy="48" r="48" fill="#E8628F"/><rect x="240" y="224" width="96" height="96" rx="10" fill="#1F6E78"/></svg>';
+const COR=/^#[0-9a-f]{6}$/i;
+// fora do login vale a última marca usada neste navegador
+function marcaAtual(){
+  if(S.db)return{nome:S.config.empresaNome||'',cnpj:S.config.cnpj||'',logo:S.config.logo||'',c1:S.config.corPrincipal||'',c2:S.config.corDestaque||''};
+  try{return JSON.parse(localStorage.getItem('km-marca')||'null')||{logo:'key'}}catch(e){return{logo:'key'}}
+}
+function aplicarMarca(){
+  const m=marcaAtual(),key=m.logo==='key';
+  const iniciais=(m.nome||'F').split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase();
+  const html=key?`${KEY_SVG}<div><b>key marketing</b><span class="spaced">Financeiro</span></div>`
+    :`${m.logo?`<img src="${esc(m.logo)}" alt="">`:`<span class="ini" aria-hidden="true">${esc(iniciais)}</span>`}<div><b class="nome">${esc(m.nome||'Seu financeiro')}</b><span class="spaced">Financeiro</span>${m.cnpj?`<span class="cnpj">CNPJ ${esc(m.cnpj)}</span>`:''}</div>`;
+  for(const id of['marca','marcaLogin']){const el=document.getElementById(id);if(el&&el.dataset.h!==html){el.innerHTML=html;el.dataset.h=html}}
+  document.title=key?'Financeiro Key Marketing':m.nome?`Financeiro ${m.nome}`:'Financeiro';
+  const st=document.documentElement.style;
+  if(!key&&COR.test(m.c2||'')){st.setProperty('--pink',m.c2);st.setProperty('--pink-ink',`color-mix(in srgb,${m.c2} 78%,var(--ink))`);st.setProperty('--pink-soft',`color-mix(in srgb,${m.c2} 16%,var(--surface))`);st.setProperty('--hero-accent',`color-mix(in srgb,${m.c2} 70%,#fff)`)}
+  else ['--pink','--pink-ink','--pink-soft','--hero-accent'].forEach(p=>st.removeProperty(p));
+  if(!key&&COR.test(m.c1||''))st.setProperty('--hero-bg',m.c1);else st.removeProperty('--hero-bg');
+  const b=document.getElementById('btnMarca');if(b)b.hidden=!S.db;
+  if(S.db&&S.carregou){try{const c={...m};if((c.logo||'').length>200000)c.logo='';localStorage.setItem('km-marca',JSON.stringify(c))}catch(e){}}
+}
+
 /* ---------- telas ---------- */
 function render(){
+  aplicarMarca();
   document.getElementById('mLabel').textContent=`${MESES[S.ref.m-1]} ${S.ref.y}`;
   const atras=S.obrig.filter(o=>obStatus(o)==='vencido').length;
   document.querySelectorAll('#tabs button').forEach(b=>{
@@ -384,6 +408,7 @@ function render(){
   if(!S.db&&S.loaded<0)html+=`<div class="banner">Não foi possível carregar a conexão com o banco de dados. Confira a internet e recarregue a página.</div>`;
   if(S.semAcesso)html+=`<div class="banner">A conta ${esc(S.email||'')} entrou, mas ainda não tem acesso aos dados da empresa. Peça para liberar este e-mail no Supabase.</div>`;
   if(!S.canWrite&&!S.semAcesso)html+=`<div class="banner">Você está vendo o painel em modo leitura.</div>`;
+  if(S.db&&S.carregou&&!S.config.empresaNome&&S.canWrite)html+=`<div class="banner" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Cadastre o nome, o CNPJ, o logo e as cores da sua empresa. Eles aparecem no topo do painel.</span><button class="btn primary sm" data-act="marca">Cadastrar empresa</button></div>`;
   html+=({geral:vGeral,lanc:vLanc,notas:vNotas,impostos:vImpostos,cal:vCal,beneficios:vBeneficios,clt:vClt}[S.view]||vGeral)();
   // mantém o campo em que a pessoa está digitando quando chegam dados novos
   const ae=document.activeElement,fid=ae&&app.contains(ae)&&ae.id,fval=fid&&ae.value;
@@ -409,35 +434,72 @@ function irrf(bruto,inssV,deps,simplificado){
   return r2(Math.max(0,imp-red));
 }
 function liquido(bruto,deps,simplificado){const i=inss(bruto),ir=irrf(bruto,i,deps,simplificado);return{bruto:r2(bruto),inss:i,ir,liq:r2(bruto-i-ir)}}
+/* funcionários: cada um com os próprios salários, descontos, 13º e férias */
+const salDe=f=>(f&&S.clt[f.id])||{};
+const funcAtual=()=>S.func.find(f=>f.id===S.funcSel)||S.func.find(f=>f.ativo!==false)||S.func[0]||null;
+const ordemFunc=()=>[...S.func].sort((a,b)=>(a.ativo===false)-(b.ativo===false)||String(a.nome).localeCompare(String(b.nome),'pt'));
+const ehPj=f=>f&&f.regime==='pj';
+const REGIME={clt:'CLT',pj:'PJ'};
+// PJ não tem INSS nem IR descontados na folha
+function liquidoF(bruto,f,simpl){if(ehPj(f))return{bruto:r2(bruto),inss:0,ir:0,liq:r2(bruto)};return liquido(bruto,+f.dependentes||0,simpl)}
 // 13º = soma dos salários do ano ÷ meses com salário; férias = 13º + 1/3
-function cltCalc(y){
-  const adm=S.config.cltAdmissao;if(!adm)return null;
-  const admY=+adm.slice(0,4),admM=+adm.slice(5,7);
-  const ini=y<admY?13:y===admY?admM:1;
-  const vals=MESES.map((_,i)=>i+1>=ini?(S.clt[ym(y,i+1)]||0):0);
+function cltCalc(y,f){
+  if(!f||!f.admissao)return null;
+  const adm=f.admissao,admY=+adm.slice(0,4),admM=+adm.slice(5,7);
+  const ini=y<admY?13:y===admY?admM:1,sal=salDe(f);
+  const vals=MESES.map((_,i)=>i+1>=ini?(sal[ym(y,i+1)]||0):0);
   const n=vals.filter(v=>v>0).length,soma=vals.reduce((a,b)=>a+b,0);
   const dec=n?soma/n:0,terco=dec/3,fer=dec+terco;
-  const deps=+S.config.cltDependentes||0;
-  // outros descontos cadastrados (plano de saúde, empréstimo…) saem do líquido
+  const deps=+f.dependentes||0;
+  // outros descontos (plano de saúde, empréstimo…) saem do líquido
   // o 13º é pago em dezembro: vale o desconto ativo em dezembro; nas férias, o que estiver ativo no mês escolhido no topo
-  const o13=descontosDe('13',ym(y,12)),oFer=descontosDe('ferias',refYM());
-  const b13=liquido(dec,deps,false),bFer=liquido(fer,deps,true);
+  const o13=descontosDe('13',ym(y,12),f),oFer=descontosDe('ferias',refYM(),f);
+  const b13=liquidoF(dec,f,false),bFer=liquidoF(fer,f,true);
   const l13={...b13,outros:o13,liq:r2(b13.liq-o13)},lFer={...bFer,outros:oFer,liq:r2(bFer.liq-oFer)};
-  return{adm,ini,vals,n,soma,dec,terco,fer,total:dec+fer,deps,l13,lFer,parc1:r2(dec/2),parc2:r2(l13.liq-dec/2)};
+  return{f,adm,ini,vals,n,soma,dec,terco,fer,total:dec+fer,deps,l13,lFer,parc1:r2(dec/2),parc2:r2(l13.liq-dec/2)};
+}
+// visão de todos os funcionários: salário do mês, 13º e férias de cada um
+function vFolha(y){
+  const k=refYM(),dis=S.canWrite?'':'disabled',sel=funcAtual();
+  const linhas=ordemFunc().map(f=>{const c=cltCalc(y,f),v=salDe(f)[k]||0,s=v?salarioLiquido(k,f):null;return{f,c,v,s}});
+  const ativos=linhas.filter(l=>l.f.ativo!==false);
+  const soma=fn=>r2(ativos.reduce((a,l)=>a+(fn(l)||0),0));
+  const folha=soma(l=>l.v),folhaLiq=soma(l=>l.s&&l.s.liq),dec=soma(l=>l.c&&l.c.dec),fer=soma(l=>l.c&&l.c.fer);
+  return `
+  <section class="kpis">
+    <div class="kpi"><div class="lbl">Funcionários</div><div class="val">${ativos.length}</div><div class="sub">${linhas.length-ativos.length?`+ ${linhas.length-ativos.length} desligado(s)`:'ativos'}</div></div>
+    <div class="kpi"><div class="lbl">Folha de ${MESES[S.ref.m-1]}</div><div class="val">${brl(folha)}</div><div class="sub">bruto · líquido ${brl(folhaLiq)}</div></div>
+    <div class="kpi hl"><div class="lbl">13º de ${y}</div><div class="val">${brl(dec)}</div><div class="sub">bruto, todos os funcionários</div></div>
+    <div class="kpi"><div class="lbl">Férias + 1/3</div><div class="val pos">${brl(fer)}</div><div class="sub">bruto, todos os funcionários</div></div>
+  </section>
+  <div class="panel">
+    <div class="ph"><h2>Funcionários${S.config.empresaNome?` · ${esc(S.config.empresaNome)}`:''}</h2><div class="toolbar"><span class="hint">salário de ${MESES[S.ref.m-1]}</span><button class="btn primary sm" data-act="novoFunc" ${dis}>+ Funcionário</button></div></div>
+    <div class="tw"><table><thead><tr><th>Funcionário</th><th>Regime</th><th class="num">Salário bruto</th><th class="num">Líquido</th><th class="num">13º</th><th class="num">Férias + 1/3</th><th></th></tr></thead><tbody>
+    ${linhas.map(({f,c,v,s})=>`<tr style="${f.ativo===false?'opacity:.55':''}${sel&&sel.id===f.id?';background:var(--pink-soft)':''}"><td><b>${esc(f.nome)}</b>${f.eu?'<span class="tag">você</span>':''}${f.ativo===false?'<span class="tag">desligado</span>':''}<div class="muted">${esc([f.cargo,f.cpf&&'CPF '+f.cpf].filter(Boolean).join(' · ')||'—')}</div></td>
+      <td>${REGIME[f.regime]||'CLT'}</td><td class="num">${v?brl(v):'<span class="muted">não lançado</span>'}</td><td class="num">${s?`<b>${brl(s.liq)}</b>`:'<span class="muted">—</span>'}</td>
+      <td class="num">${c&&c.n?brl(c.dec):'<span class="muted">—</span>'}</td><td class="num">${c&&c.n?brl(c.fer):'<span class="muted">—</span>'}</td>
+      <td class="acts"><button class="btn ${sel&&sel.id===f.id?'teal':''} sm" data-act="verFunc" data-id="${f.id}" aria-pressed="${!!(sel&&sel.id===f.id)}">${sel&&sel.id===f.id?'Aberto':'Abrir'}</button></td></tr>`).join('')}
+    </tbody><tfoot><tr><td colspan="2">Total dos ativos</td><td class="num">${brl(folha)}</td><td class="num">${brl(folhaLiq)}</td><td class="num">${brl(dec)}</td><td class="num">${brl(fer)}</td><td></td></tr></tfoot></table></div>
+    <p class="note" style="margin:12px 0 0">Clique em <b>Abrir</b> para lançar os salários e os descontos de cada funcionário. Os valores de 13º e férias são brutos; o líquido de cada um aparece ao abrir.</p>
+  </div>`;
 }
 function vClt(){
   const dis=S.canWrite?'':'disabled';
-  const y=S.ref.y,c=cltCalc(y);
-  if(!c)return `<div class="panel"><div class="empty"><b>CLT (pessoa física)</b>Aqui você lança seus salários CLT, separados da PJ. Informe primeiro a data de admissão.<div style="margin-top:14px"><button class="btn primary" data-act="cltDados" ${dis}>Informar data de admissão</button></div></div></div>`;
-  const possiveis=Math.max(0,13-c.ini);
+  if(!S.func.length)return `<div class="panel"><div class="empty"><b>Nenhum funcionário cadastrado</b>Cadastre cada funcionário da empresa com nome, regime e data de admissão. Depois, lance o salário de cada mês: o painel calcula o líquido, o 13º e as férias de cada um.<div style="margin-top:14px"><button class="btn primary" data-act="novoFunc" ${dis}>+ Funcionário</button></div></div></div>`;
+  const y=S.ref.y,f=funcAtual(),c=cltCalc(y,f);
+  const cab=`<div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>${esc(f.nome)}</b>${f.cargo?` · ${esc(f.cargo)}`:''} · ${ehPj(f)?'PJ, sem INSS e IR':'CLT'}${f.admissao?` · admissão em ${fmtD(f.admissao)}`:''}. Nada da folha entra nas entradas, saídas ou no 13º da PJ.</span><span class="toolbar"><button class="btn ghost sm" data-act="editFunc" data-id="${f.id}" ${dis}>Editar funcionário</button>${S.canWrite?`<button class="btn ghost sm danger" data-act="delFunc" data-id="${f.id}">Excluir</button>`:''}</span></div>`;
+  if(!c)return vFolha(y)+cab+`<div class="panel"><div class="empty"><b>Falta a data de admissão de ${esc(f.nome)}</b>Os meses antes da admissão não entram no 13º e nas férias.<div style="margin-top:14px"><button class="btn primary" data-act="editFunc" data-id="${f.id}" ${dis}>Informar data de admissão</button></div></div></div>`;
+  const possiveis=Math.max(0,13-c.ini),sal=salDe(f);
   const rows=MESES.map((m,i)=>{const k=ym(y,i+1),v=c.vals[i];
     if(i+1<c.ini)return `<tr class="zero"><td style="text-transform:capitalize">${m}</td><td class="num"><span class="muted">antes da admissão</span></td><td></td></tr>`;
-    const lq=v?salarioLiquido(k):null;
-    return `<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td><td class="num"><input id="clt-${k}" data-clt="${k}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Salário bruto de ${m}" ${dis}></td>
+    const lq=v?salarioLiquido(k,f):null;
+    return `<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td><td class="num"><input id="clt-${esc(f.id)}-${k}" data-clt="${k}" data-f="${esc(f.id)}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Salário bruto de ${m} de ${esc(f.nome)}" ${dis}></td>
       <td class="num">${lq?`<b>${brl(lq.liq)}</b>${lq.outros?`<div class="muted">− ${brl(lq.outros)} de descontos</div>`:''}`:'<span class="muted">—</span>'}</td></tr>`}).join('');
-  const liqAno=MESES.reduce((a,_,i)=>{const k=ym(y,i+1);return a+(i+1>=c.ini&&S.clt[k]>0?salarioLiquido(k).liq:0)},0);
-  return `
-  <div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Área da <b>pessoa física</b>: nada daqui entra nas entradas, saídas ou no 13º da PJ. Admissão em ${fmtD(c.adm)}.</span><button class="btn ghost sm" data-act="cltDados" ${dis}>Admissão e dependentes</button></div>
+  const liqAno=MESES.reduce((a,_,i)=>{const k=ym(y,i+1);return a+(i+1>=c.ini&&sal[k]>0?salarioLiquido(k,f).liq:0)},0);
+  const irOp=`${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026`;
+  const linhasImp=l=>ehPj(f)?`<div><span>Sem INSS e IR<span class="op">funcionário PJ</span></span><b>${brl(0)}</b></div>`:`<div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(l.inss)}</b></div>
+      <div><span>− Imposto de Renda<span class="op">${irOp}</span></span><b class="neg">${brl(l.ir)}</b></div>`;
+  return `${vFolha(y)}${cab}
   <section class="kpis">
     <div class="kpi"><div class="lbl">Salários de ${y}</div><div class="val">${brl(c.soma)}</div><div class="sub">soma dos meses lançados</div></div>
     <div class="kpi"><div class="lbl">Meses lançados</div><div class="val">${c.n}</div><div class="sub">de ${possiveis}${c.ini>1&&c.ini<=12?` (${MESES[c.ini-1].slice(0,3)} a dez)`:''}</div></div>
@@ -446,10 +508,10 @@ function vClt(){
   </section>
   <section class="grid2">
   <div class="panel">
-    <div class="ph"><h2>Salários CLT de ${y}</h2><span class="hint">valor bruto do holerite</span></div>
+    <div class="ph"><h2>Salários de ${esc(f.nome)} em ${y}</h2><span class="hint">valor bruto do holerite</span></div>
     <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Salário bruto</th><th class="num">Líquido</th></tr></thead><tbody>${rows}</tbody>
     <tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td><td class="num">${brl(liqAno)}</td></tr></tfoot></table></div>
-    <p class="note" style="margin:12px 0 0">Lance o <b>total de vencimentos</b> do holerite, antes dos descontos de INSS e IR. Mês em branco não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
+    <p class="note" style="margin:12px 0 0">Lance o <b>total de vencimentos</b> do holerite, antes dos descontos. Mês em branco não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
   </div>
   <div class="panel">
     <div class="ph"><h2>Como o cálculo é feito</h2></div>
@@ -464,70 +526,69 @@ function vClt(){
   </div></section>
   <section class="grid2">
   <div class="panel">
-    <div class="ph"><h2>13º: do bruto ao líquido</h2><span class="hint">tributação separada do salário</span></div>
+    <div class="ph"><h2>13º: do bruto ao líquido</h2><span class="hint">${ehPj(f)?'sem descontos de imposto':'tributação separada do salário'}</span></div>
     <div class="calc">
       <div><span>13º bruto</span><b>${brl(c.l13.bruto)}</b></div>
-      <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(c.l13.inss)}</b></div>
-      <div><span>− Imposto de Renda<span class="op">${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(c.l13.ir)}</b></div>
-      ${c.l13.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('13',ym(y,12)))}</span></span><b class="neg">${brl(c.l13.outros)}</b></div>`:''}
+      ${linhasImp(c.l13)}
+      ${c.l13.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('13',ym(y,12),f))}</span></span><b class="neg">${brl(c.l13.outros)}</b></div>`:''}
       <div><span><b>13º líquido</b></span><span class="big">${brl(c.l13.liq)}</span></div>
-      <div><span>1ª parcela, até 30/11<span class="op">metade do bruto, sem desconto</span></span><b>${brl(c.parc1)}</b></div>
-      <div><span>2ª parcela, até 20/12<span class="op">líquido − 1ª parcela</span></span><b>${brl(c.parc2)}</b></div>
+      ${ehPj(f)?'':`<div><span>1ª parcela, até 30/11<span class="op">metade do bruto, sem desconto</span></span><b>${brl(c.parc1)}</b></div>
+      <div><span>2ª parcela, até 20/12<span class="op">líquido − 1ª parcela</span></span><b>${brl(c.parc2)}</b></div>`}
     </div>
   </div>
   <div class="panel">
     <div class="ph"><h2>Férias: do bruto ao líquido</h2><span class="hint">férias + 1/3</span></div>
     <div class="calc">
       <div><span>Férias + 1/3 bruto</span><b>${brl(c.lFer.bruto)}</b></div>
-      <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(c.lFer.inss)}</b></div>
-      <div><span>− Imposto de Renda<span class="op">${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(c.lFer.ir)}</b></div>
-      ${c.lFer.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('ferias',refYM()))}</span></span><b class="neg">${brl(c.lFer.outros)}</b></div>`:''}
+      ${linhasImp(c.lFer)}
+      ${c.lFer.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('ferias',refYM(),f))}</span></span><b class="neg">${brl(c.lFer.outros)}</b></div>`:''}
       <div><span><b>Férias líquido</b></span><span class="big pos">${brl(c.lFer.liq)}</span></div>
     </div>
-    <p class="note" style="margin:12px 0 0">Estimativa com as tabelas de 2026. O holerite da empresa é o valor oficial: o INSS das férias pode sair diferente, porque a empresa soma as férias ao salário do mês. ${c.deps?'':'Se você tem dependentes no IR, informe em “Admissão e dependentes”.'}</p>
+    <p class="note" style="margin:12px 0 0">Estimativa com as tabelas de 2026. O holerite é o valor oficial: o INSS das férias pode sair diferente, porque a empresa soma as férias ao salário do mês. ${c.deps||ehPj(f)?'':'Se houver dependentes no IR, informe em “Editar funcionário”.'}</p>
   </div></section>
-  <section class="grid2">${vSalario()}${vDescontos()}</section>`;
+  <section class="grid2">${vSalario(f)}${vDescontos(f)}</section>`;
 }
 const APLICA={salario:'Salário (todo mês)',ambos:'13º e férias','13':'Só no 13º',ferias:'Só nas férias'};
 // salário do mês escolhido no topo (ou o último lançado antes dele), do bruto ao líquido
-function salarioMes(){
-  const k=refYM(),meses=Object.keys(S.clt).filter(m=>S.clt[m]>0&&m<=k).sort();
+function salarioMes(f){
+  const k=refYM(),sal=salDe(f),meses=Object.keys(sal).filter(m=>sal[m]>0&&m<=k).sort();
   if(!meses.length)return null;
-  const mes=S.clt[k]>0?k:meses[meses.length-1];
-  return{mes,...salarioLiquido(mes)};
+  const mes=sal[k]>0?k:meses[meses.length-1];
+  return{mes,...salarioLiquido(mes,f)};
 }
 // desconto vale num mês se estiver ativo e o mês estiver entre o início e o fim dele
 const descontoNoMes=(d,m)=>d.ativo!==false&&+d.valor>0&&(!d.mesInicio||m>=d.mesInicio)&&(!d.mesFim||m<=d.mesFim);
 const tipoDesc=(d,k)=>k==='salario'?d.aplicaEm==='salario':(d.aplicaEm===k||d.aplicaEm==='ambos'||!d.aplicaEm);
-function descontosDe(k,m){return r2(S.desc.filter(d=>tipoDesc(d,k)&&descontoNoMes(d,m)).reduce((a,d)=>a+(+d.valor||0),0))}
-function salarioLiquido(m){
-  const deps=+S.config.cltDependentes||0,base=liquido(S.clt[m]||0,deps,true),outros=descontosDe('salario',m);
-  return{deps,...base,outros,liq:r2(base.liq-outros)};
+const descDe=f=>S.desc.filter(d=>(d.funcionario||'f1')===(f&&f.id));
+function descontosDe(k,m,f){return r2(descDe(f).filter(d=>tipoDesc(d,k)&&descontoNoMes(d,m)).reduce((a,d)=>a+(+d.valor||0),0))}
+function salarioLiquido(m,f){
+  const base=liquidoF(salDe(f)[m]||0,f,true),outros=descontosDe('salario',m,f);
+  return{deps:+f.dependentes||0,...base,outros,liq:r2(base.liq-outros)};
 }
-function vSalario(){
-  const s=salarioMes();
+function vSalario(f){
+  const s=salarioMes(f);
   if(!s)return `<div class="panel"><div class="ph"><h2>Salário do mês</h2></div><div class="empty">Lance o salário bruto de um mês para ver quanto cai na conta.</div></div>`;
   const nm=MESES[+s.mes.slice(5)-1];
   return `<div class="panel">
     <div class="ph"><h2>Salário de ${nm}: do bruto ao líquido</h2>${s.mes!==refYM()?`<span class="hint">último lançado</span>`:''}</div>
     <div class="calc">
       <div><span>Salário bruto</span><b>${brl(s.bruto)}</b></div>
-      <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(s.inss)}</b></div>
-      <div><span>− Imposto de Renda<span class="op">${s.deps?`${s.deps} dependente${s.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(s.ir)}</b></div>
-      ${s.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('salario',s.mes))}</span></span><b class="neg">${brl(s.outros)}</b></div>`:''}
+      ${ehPj(f)?`<div><span>Sem INSS e IR<span class="op">funcionário PJ</span></span><b>${brl(0)}</b></div>`:`<div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(s.inss)}</b></div>
+      <div><span>− Imposto de Renda<span class="op">${s.deps?`${s.deps} dependente${s.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(s.ir)}</b></div>`}
+      ${s.outros?`<div><span>− Outros descontos<span class="op">${esc(nomesDesc('salario',s.mes,f))}</span></span><b class="neg">${brl(s.outros)}</b></div>`:''}
       <div><span><b>Salário líquido</b><span class="op">estimativa do que cai na conta</span></span><span class="big pos">${brl(s.liq)}</span></div>
     </div>
   </div>`;
 }
-function nomesDesc(k,m){return S.desc.filter(d=>tipoDesc(d,k)&&descontoNoMes(d,m)).map(d=>d.nome).join(', ')}
+function nomesDesc(k,m,f){return descDe(f).filter(d=>tipoDesc(d,k)&&descontoNoMes(d,m)).map(d=>d.nome).join(', ')}
 const periodoDesc=d=>d.mesInicio&&d.mesFim?`${fmtYM(d.mesInicio)} a ${fmtYM(d.mesFim)}`:d.mesInicio?`desde ${fmtYM(d.mesInicio)}, sem fim`:d.mesFim?`até ${fmtYM(d.mesFim)}`:'todo mês, sem fim';
-function vDescontos(){
-  const dis=S.canWrite?'':'disabled',lista=[...S.desc].sort((a,b)=>String(a.nome).localeCompare(b.nome));
+function vDescontos(f){
+  const dis=S.canWrite?'':'disabled',lista=descDe(f).sort((a,b)=>String(a.nome).localeCompare(b.nome));
   return `<div class="panel">
-    <div class="ph"><h2>Outros descontos</h2><button class="btn primary sm" data-act="novoDesc" ${dis}>+ Desconto</button></div>
+    <div class="ph"><h2>Outros descontos de ${esc(f.nome)}</h2><button class="btn primary sm" data-act="novoDesc" ${dis}>+ Desconto</button></div>
     ${lista.length?`<div class="tw"><table><thead><tr><th>Desconto</th><th>Desconta de</th><th>Período</th><th class="num">Valor</th><th></th></tr></thead><tbody>
     ${lista.map(d=>`<tr style="${d.ativo===false?'opacity:.55':''}"><td><b>${esc(d.nome)}</b>${d.ativo===false?'<span class="tag">pausado</span>':''}${d.obs?`<div class="muted">${esc(d.obs)}</div>`:''}</td><td>${APLICA[d.aplicaEm]||APLICA.ambos}</td><td><span class="muted">${periodoDesc(d)}</span></td><td class="num"><b>${brl(d.valor)}</b></td><td class="acts">${acts('Desc',d.id)}</td></tr>`).join('')}
-    </tbody></table></div>`:`<div class="empty"><b>Nenhum desconto cadastrado</b>Cadastre o que sai do seu salário, do 13º ou das férias além de INSS e IR, como plano de saúde, empréstimo consignado ou pensão. Cada desconto entra só onde você escolher.</div>`}
+    </tbody></table></div>`:`<div class="empty"><b>Nenhum desconto cadastrado</b>Cadastre o que sai do salário, do 13º ou das férias além de INSS e IR, como plano de saúde, empréstimo consignado ou pensão. Cada desconto entra só onde você escolher.</div>`}
   </div>`;
 }
 
@@ -633,7 +694,9 @@ function vImpostosConta(){
 
 /* resumo do fim de ano: 13º e férias da PJ (sem o DAS) + CLT (líquido) */
 function resumoAno(y){
-  const pj=calcBenef(y),clt=cltCalc(y),temPj=pj.n>0,temClt=!!clt&&clt.n>0;
+  // na CLT, entra no "Seu fim de ano" só o funcionário marcado como "sou eu"
+  const eu=S.func.find(f=>f.eu&&f.ativo!==false);
+  const pj=calcBenef(y),clt=cltCalc(y,eu),temPj=pj.n>0,temClt=!!clt&&clt.n>0;
   const decPj=temPj?semDas(pj.dec):0,ferPj=temPj?semDas(pj.fer):0,decClt=temClt?clt.l13.liq:0,ferClt=temClt?clt.lFer.liq:0;
   return{pj,clt,temPj,temClt,decPj,ferPj,decClt,ferClt,dec:decPj+decClt,fer:ferPj+ferClt,tot:decPj+decClt+ferPj+ferClt};
 }
@@ -979,9 +1042,22 @@ const F={
   config:{t:'cálculo do DAS',f:[
     {k:'aliquota',l:'Alíquota efetiva (%)',type:'money',req:1,help:'Veja no último PGDAS-D'},
     {k:'anexo',l:'Enquadramento',type:'text',ph:'Ex.: Simples Nacional – Anexo III'}]},
-  cltDados:{t:'dados da CLT',f:[
-    {k:'cltAdmissao',l:'Data de admissão',type:'date',req:1,help:'Meses antes da admissão não entram no 13º e nas férias.'},
-    {k:'cltDependentes',l:'Dependentes no IR',type:'number',help:'Filhos ou outros dependentes declarados à empresa. 0 se nenhum.'}]},
+  func:{t:'funcionário',col:'funcionarios',f:[
+    {k:'nome',l:'Nome',type:'text',req:1,full:1,ph:'Nome completo'},
+    {k:'cargo',l:'Cargo',type:'text',ph:'Ex.: Designer'},
+    {k:'cpf',l:'CPF',type:'text',ph:'000.000.000-00'},
+    {k:'regime',l:'Regime',type:'select',opts:[['clt','CLT (desconta INSS e IR)'],['pj','PJ (sem INSS e IR)']]},
+    {k:'admissao',l:'Data de admissão',type:'date',req:1,help:'Meses antes não entram no 13º e nas férias.'},
+    {k:'dependentes',l:'Dependentes no IR',type:'number',help:'0 se nenhum'},
+    {k:'obs',l:'Observação',type:'text',full:1},
+    {k:'eu',l:'Sou eu: entra no quadro “Seu fim de ano”',type:'check',def:false},
+    {k:'ativo',l:'Ativo (desmarque quando a pessoa sair da empresa)',type:'check'}]},
+  marca:{t:'dados da empresa',f:[
+    {k:'empresaNome',l:'Nome da empresa',type:'text',req:1,full:1,ph:'Ex.: Studio Aurora'},
+    {k:'cnpj',l:'CNPJ',type:'text',full:1,ph:'00.000.000/0001-00'},
+    {k:'logo',l:'Logo',type:'logo',full:1,help:'PNG, JPG ou SVG. Em branco mantém o logo atual.'},
+    {k:'corPrincipal',l:'Cor principal',type:'color',help:'Faixa do resumo e destaques escuros'},
+    {k:'corDestaque',l:'Cor de destaque',type:'color',help:'Botões e abas'}]},
   inicio:{t:'início da PJ',f:[
     {k:'inicioPj',l:'Mês em que a PJ começou',type:'month',req:1,full:1,help:'Meses anteriores não entram no 13º e nas férias. Nos anos seguintes a conta começa em janeiro.'}]}
 };
@@ -994,6 +1070,7 @@ function openForm(kind,rec,defaults){
     if(f.type==='select')inp=`<select id="${id}" name="${f.k}">${f.opts.map(([a,b])=>`<option value="${a}" ${String(v)===a?'selected':''}>${b}</option>`).join('')}</select>`;
     else if(f.type==='check'){const on=v===''?f.def!==false:!!v;return `<div class="f check full"><input type="checkbox" id="${id}" name="${f.k}" ${on?'checked':''}><label for="${id}">${f.l}</label></div>`}
     else if(f.type==='list')inp=`<input id="${id}" name="${f.k}" list="${id}-l" value="${esc(v)}" ${f.req?'required':''} autocomplete="off"><datalist id="${id}-l">${f.list(r).map(o=>`<option value="${esc(o)}">`).join('')}</datalist>`;
+    else if(f.type==='logo')inp=`<input id="${id}" name="${f.k}" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp">${v&&v!=='key'?`<img src="${esc(v)}" alt="Logo atual" style="max-height:48px;width:auto;justify-self:start">`:''}`;
     else if(f.type==='money')inp=`<input id="${id}" name="${f.k}" type="number" step="0.01" min="0" inputmode="decimal" value="${v===''?'':esc(v)}" ${f.req?'required':''}>`;
     else inp=`<input id="${id}" name="${f.k}" type="${f.type}" value="${esc(v)}" ${f.req?'required':''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}>`;
     return `<div class="f ${f.full?'full':''}"><label for="${id}">${f.l}</label>${inp}${f.help?`<span class="help">${f.help}</span>`:''}</div>`;
@@ -1016,6 +1093,7 @@ function openForm(kind,rec,defaults){
     const out={};
     for(const f of spec.f){const el=form[f.k];
       if(f.type==='check'){out[f.k]=el.checked;continue}
+      if(f.type==='logo'){const file=el.files&&el.files[0];if(file){try{out[f.k]=await reduzLogo(file)}catch(x){err.textContent=x.message||'Não deu para ler essa imagem.';err.hidden=false;return}}continue}
       let v=el.value.trim();
       if(f.req&&!v){err.textContent=`Preencha “${f.l}”.`;err.hidden=false;el.focus();return}
       if(f.type==='money'||f.type==='number')v=v===''?0:Number(v);
@@ -1026,6 +1104,18 @@ function openForm(kind,rec,defaults){
   });
 }
 function closeModal(){if(modal){modal.remove();modal=null}}
+// o logo é guardado pequeno (até 320 px) dentro da configuração da conta
+function reduzLogo(file){
+  return new Promise((ok,falha)=>{
+    if(file.size>5e6)return falha(new Error('A imagem passa de 5 MB. Use uma menor.'));
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{const max=320,w=img.naturalWidth||max,h=img.naturalHeight||max,k=Math.min(1,max/Math.max(w,h));
+      const cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(w*k));cv.height=Math.max(1,Math.round(h*k));
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);URL.revokeObjectURL(url);ok(cv.toDataURL('image/png'))};
+    img.onerror=()=>{URL.revokeObjectURL(url);falha(new Error('Não deu para ler essa imagem. Use PNG, JPG ou SVG.'))};
+    img.src=url;
+  });
+}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 
 function msgErr(x){if(x)console.error(x);const c=x&&x.code;if(c==='42501'){S.canWrite=false;render();return'Esta conta não tem permissão para alterar os dados.'}if(c==='no_db')return'O painel não está conectado ao banco de dados. Entre com sua conta.';if(c==='PGRST301'||/JWT/i.test(x?.message||''))return'Sua sessão expirou. Saia e entre de novo.';return'Não deu para salvar agora. Confira a internet e tente de novo.'}
@@ -1034,13 +1124,15 @@ function msgErr(x){if(x)console.error(x);const c=x&&x.code;if(c==='42501'){S.can
 const SB_URL='https://qqqvoyqdmhicolyklswb.supabase.co';
 const SB_KEY='sb_publishable_j43C2RbszxXFvkS12aopQw_hw2M5aEp';
 const sb=window.supabase?window.supabase.createClient(SB_URL,SB_KEY):null;
-const KEY={lancamentos:'lanc',notas:'notas',obrigacoes:'obrig',modelos:'modelos',descontos:'desc'};
+const KEY={lancamentos:'lanc',notas:'notas',obrigacoes:'obrig',modelos:'modelos',descontos:'desc',funcionarios:'func'};
+const CHAVE={beneficios:'dono,ano',clt_salarios:'dono,funcionario,id'};
+const lembrarFunc=()=>{try{localStorage.setItem('km-func',S.funcSel||'')}catch(e){}};
 const snake=k=>k.replace(/[A-Z]/g,c=>'_'+c.toLowerCase());
 const camel=k=>k.replace(/_([a-z])/g,(_,c)=>c.toUpperCase());
 function toRow(col,obj){const r={};for(const[k,v]of Object.entries(obj)){if(v===undefined)continue;if(col==='beneficios'&&k==='id')continue;r[snake(k)]=v===''?null:v}return r}
 function fromRow(row){const o={};for(const[k,v]of Object.entries(row))o[camel(k)]=v;return o}
 function guardar(col,row){
-  if(col==='clt_salarios'){S.clt[row.id]=+row.valor||0;return}
+  if(col==='clt_salarios'){(S.clt[row.funcionario]||(S.clt[row.funcionario]={}))[row.id]=+row.valor||0;return}
   if(col==='beneficios'){S.benef[String(row.ano)]={meses:row.meses||{}};return}
   if(col==='config'){S.config={aliquota:6,...fromRow(row)};return}
   const k=KEY[col],o=fromRow(row),i=S[k].findIndex(x=>x.id===o.id);
@@ -1050,27 +1142,32 @@ async function put(col,id,data){
   if(!S.db)throw{code:'no_db'};
   const row=toRow(col,{...data,id});row.atualizado_em=new Date().toISOString();row.dono=S.uid;
   // cada conta tem os próprios dados: a chave é (dono, id)
-  const{data:saved,error}=await sb.from(col).upsert(row,{onConflict:col==='beneficios'?'dono,ano':'dono,id'}).select().single();
+  const{data:saved,error}=await sb.from(col).upsert(row,{onConflict:CHAVE[col]||'dono,id'}).select().single();
   if(error)throw error;
   guardar(col,saved);later();
 }
-async function del(col,id){
+async function del(col,id,func){
   if(!S.db)throw{code:'no_db'};
-  const{error}=await sb.from(col).delete().eq('dono',S.uid).eq('id',id);
+  let q=sb.from(col).delete().eq('dono',S.uid).eq('id',id);
+  if(col==='clt_salarios')q=q.eq('funcionario',func);
+  const{error}=await q;
   if(error)throw error;
-  if(col==='clt_salarios')delete S.clt[id];
+  if(col==='clt_salarios'&&S.clt[func])delete S.clt[func][id];
   const k=KEY[col];if(k)S[k]=S[k].filter(x=>x.id!==id);later();
 }
 const newId=()=>(crypto.randomUUID?crypto.randomUUID():'x'+Date.now()+Math.random().toString(36).slice(2));
 
 async function save(kind,rec,out){
-  if(kind==='config'||kind==='inicio'||kind==='cltDados'){
+  if(kind==='config'||kind==='inicio'||kind==='marca'){
+    if(kind==='marca'&&out.logo===undefined)delete out.logo;
     const{id:_i,atualizadoEm:_a,...atual}=S.config;
     await put('config','empresa',{...atual,...out});if(kind==='config')await atualizarDas();return}
   const spec=F[kind];const id=rec?.id||newId(spec.col);
   const base={...(rec||{})};delete base.id;
   const data={...base,...out,atualizadoEm:new Date().toISOString()};
   if(kind==='fixa'){data.tipo='despesa';data.calculo='fixo'}
+  if(kind==='desconto'&&!data.funcionario)data.funcionario=funcAtual()?.id||'f1';
+  if(kind==='func'){data.dependentes=Math.max(0,Math.round(+data.dependentes||0));if(!rec){S.funcSel=id;lembrarFunc()}}
   if(kind==='nota'){if(data.status==='recebida'&&!data.recebidoEm)data.recebidoEm=hoje();if(data.status!=='recebida')data.recebidoEm=''}
   if(kind==='ob'){if(data.status==='pago'&&!data.pagoEm)data.pagoEm=hoje();if(data.status!=='pago')data.pagoEm='';if(rec&&+rec.valor!==+data.valor)data.calculado=false}
   await put(spec.col,id,data);
@@ -1105,6 +1202,10 @@ async function act(a,id,btn){
     case'novaFixa':return openForm('fixa',null,{periodicidade:'mensal',dia:10,ajuste:'proximo',categoria:'Aluguel e coworking',ativo:true});
     case'editFixa':return openForm('fixa',M);
     case'novoDesc':return openForm('desconto',null,{aplicaEm:'salario',ativo:true,mesInicio:refYM()});
+    case'novoFunc':return openForm('func',null,{regime:'clt',dependentes:0,ativo:true,eu:false});
+    case'editFunc':return openForm('func',S.func.find(x=>x.id===id));
+    case'verFunc':S.funcSel=id;lembrarFunc();render();return;
+    case'marca':return openForm('marca',S.config,{corPrincipal:'#3A2430',corDestaque:'#E8628F'});
     case'editDesc':return openForm('desconto',S.desc.find(x=>x.id===id));
     case'gerarFixas':{const novos=fixasDoMes(S.ref.y,S.ref.m).filter(x=>!S.lanc.some(l=>l.id===x.id));for(const x of novos){const d={...x};delete d.id;await put('lancamentos',x.id,d)}return toast(`${novos.length} conta${novos.length===1?' fixa criada':'s fixas criadas'} como saída a pagar`)}
     case'editModelo':return openForm('modelo',M);
@@ -1116,7 +1217,7 @@ async function act(a,id,btn){
     case'gerar':{const novos=modelosDoMes(S.ref.y,S.ref.m).filter(x=>!S.obrig.some(o=>o.id===x.id));for(const x of novos){const d={...x};delete d.id;await put('obrigacoes',x.id,d)}return toast(`${novos.length} obrigaç${novos.length===1?'ão criada':'ões criadas'}`)}
     case'csv':return exportCSV();
     case'inicio':return openForm('inicio',S.config);
-    case'cltDados':return openForm('cltDados',S.config);
+    case'cltDados':return openForm('func',funcAtual());
     case'preencherBenef':{const y=S.ref.y,meses={...benefMeses(y)};let n=0;
       for(let i=mesInicial(y);i<=12;i++){const k=pad(i);if(+meses[k])continue;const e=entradasMes(ym(y,i));if(e>0){meses[k]=Math.round(e*100)/100;n++}}
       await put('beneficios',String(y),{ano:y,meses,atualizadoEm:new Date().toISOString()});return toast(`${n} ${n===1?'mês preenchido':'meses preenchidos'} com as entradas`)}
@@ -1129,6 +1230,12 @@ async function act(a,id,btn){
     if(a==='delOb'){await del('obrigacoes',id);if(S.lanc.some(l=>l.id==='ob-'+id))await del('lancamentos','ob-'+id)}
     if(a==='delModelo'||a==='delFixa')await del('modelos',id);
     if(a==='delDesc')await del('descontos',id);
+    if(a==='delFunc'){
+      // leva junto os salários e os descontos da pessoa
+      for(const[e,col]of[['clt_salarios','funcionario'],['descontos','funcionario']]){const{error}=await sb.from(e).delete().eq('dono',S.uid).eq(col,id);if(error)throw error}
+      await del('funcionarios',id);delete S.clt[id];S.desc=S.desc.filter(d=>d.funcionario!==id);
+      if(S.funcSel===id){S.funcSel=null;lembrarFunc()}render();
+    }
     toast('Excluído');
   }
   }catch(x){toast(msgErr(x))}
@@ -1154,8 +1261,8 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',async e=>{
   const ce=e.target.closest('[data-clt]');
-  if(ce){const id=ce.dataset.clt,v=Math.round(Number(ce.value)*100)/100;
-    try{if(v>0)await put('clt_salarios',id,{valor:v});else if(S.clt[id]!==undefined)await del('clt_salarios',id)}catch(x){toast(msgErr(x))}
+  if(ce){const id=ce.dataset.clt,fid=ce.dataset.f,v=Math.round(Number(ce.value)*100)/100;
+    try{if(v>0)await put('clt_salarios',id,{valor:v,funcionario:fid});else if(S.clt[fid]&&S.clt[fid][id]!==undefined)await del('clt_salarios',id,fid)}catch(x){toast(msgErr(x))}
     return}
   const el=e.target.closest('[data-bm]');if(!el)return;
   const y=S.ref.y,meses={...benefMeses(y)},v=Number(el.value);
@@ -1171,17 +1278,18 @@ document.getElementById('mHoje').onclick=()=>{const d=new Date();S.ref={y:d.getF
 /* ---------- dados ---------- */
 let renderQ=0;const later=()=>{cancelAnimationFrame(renderQ);renderQ=requestAnimationFrame(render)};
 async function carregar(){
-  const tabelas=['lancamentos','notas','obrigacoes','modelos','beneficios','config','clt_salarios','descontos'];
+  const tabelas=['lancamentos','notas','obrigacoes','modelos','beneficios','config','clt_salarios','descontos','funcionarios'];
   const res=await Promise.all(tabelas.map(t=>sb.from(t).select('*'))).catch(e=>[{error:e}]);
   const falha=res.find(r=>r.error);
   if(falha){console.error(falha.error);S.offline=true;render();return}
-  const[l,n,o,m,b,c,cl,ds]=res.map(r=>r.data);
-  S.desc=ds.map(fromRow);
-  S.clt=Object.fromEntries(cl.map(r=>[r.id,+r.valor||0]));
+  const[l,n,o,m,b,c,cl,ds,fu]=res.map(r=>r.data);
+  S.desc=ds.map(fromRow);S.func=fu.map(fromRow);
+  S.clt={};cl.forEach(r=>{(S.clt[r.funcionario]||(S.clt[r.funcionario]={}))[r.id]=+r.valor||0});
+  if(!S.funcSel){try{S.funcSel=localStorage.getItem('km-func')||null}catch(e){}}
   S.lanc=l.map(fromRow);S.notas=n.map(fromRow);S.obrig=o.map(fromRow);S.modelos=m.map(fromRow);
   S.benef=Object.fromEntries(b.map(r=>[String(r.ano),{meses:r.meses||{}}]));
   const cf=c.find(r=>r.id==='empresa');if(cf)S.config={aliquota:6,...fromRow(cf)};
-  S.offline=false;render();
+  S.offline=false;S.carregou=true;render();
   automaticos().catch(x=>console.error('automáticos',x));
 }
 /* impostos do mês atual e do próximo aparecem sozinhos; o DAS acompanha as notas até ser pago */
@@ -1211,7 +1319,7 @@ async function entrou(session){
   if(ok)await carregar();else render();
 }
 function pedirLogin(){
-  S.db=null;S.uid=null;S.email=null;S.lanc=[];S.notas=[];S.obrig=[];S.modelos=[];S.benef={};S.clt={};S.desc=[];S.config={aliquota:6};S.semAcesso=false;
+  S.db=null;S.uid=null;S.email=null;S.lanc=[];S.notas=[];S.obrig=[];S.modelos=[];S.benef={};S.clt={};S.desc=[];S.func=[];S.funcSel=null;S.config={aliquota:6};S.semAcesso=false;S.carregou=false;
   document.getElementById('btnSair').hidden=true;
   document.getElementById('login').hidden=false;
   render();setTimeout(()=>document.getElementById('lgEmail').focus(),30);
