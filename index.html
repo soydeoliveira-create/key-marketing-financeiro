@@ -882,7 +882,7 @@ const newId=()=>(crypto.randomUUID?crypto.randomUUID():'x'+Date.now()+Math.rando
 async function save(kind,rec,out){
   if(kind==='config'||kind==='inicio'||kind==='cltDados'){
     const{id:_i,atualizadoEm:_a,...atual}=S.config;
-    await put('config','empresa',{...atual,...out});return}
+    await put('config','empresa',{...atual,...out});if(kind==='config')await atualizarDas();return}
   const spec=F[kind];const id=rec?.id||newId(spec.col);
   const base={...(rec||{})};delete base.id;
   const data={...base,...out,atualizadoEm:new Date().toISOString()};
@@ -890,7 +890,7 @@ async function save(kind,rec,out){
   if(kind==='nota'){if(data.status==='recebida'&&!data.recebidoEm)data.recebidoEm=hoje();if(data.status!=='recebida')data.recebidoEm=''}
   if(kind==='ob'){if(data.status==='pago'&&!data.pagoEm)data.pagoEm=hoje();if(data.status!=='pago')data.pagoEm='';if(rec&&+rec.valor!==+data.valor)data.calculado=false}
   await put(spec.col,id,data);
-  if(kind==='nota')await syncNota({...data,id});
+  if(kind==='nota'){await syncNota({...data,id});await atualizarDas()}
   if(kind==='ob')await syncOb({...data,id});
 }
 async function syncNota(n){
@@ -939,7 +939,7 @@ async function act(a,id,btn){
     if(!armed[a+id]){armed[a+id]=1;btn.classList.add('armed');btn.textContent='Confirmar';setTimeout(()=>{delete armed[a+id];if(btn.isConnected){btn.classList.remove('armed');btn.textContent='Excluir'}},3500);return}
     delete armed[a+id];
     if(a==='delLanc')await del('lancamentos',id);
-    if(a==='delNota'){await del('notas',id);if(S.lanc.some(l=>l.id==='nf-'+id))await del('lancamentos','nf-'+id)}
+    if(a==='delNota'){await del('notas',id);if(S.lanc.some(l=>l.id==='nf-'+id))await del('lancamentos','nf-'+id);await atualizarDas()}
     if(a==='delOb'){await del('obrigacoes',id);if(S.lanc.some(l=>l.id==='ob-'+id))await del('lancamentos','ob-'+id)}
     if(a==='delModelo'||a==='delFixa')await del('modelos',id);
     toast('Excluído');
@@ -994,6 +994,24 @@ async function carregar(){
   S.benef=Object.fromEntries(b.map(r=>[String(r.ano),{meses:r.meses||{}}]));
   const cf=c.find(r=>r.id==='empresa');if(cf)S.config={aliquota:6,...fromRow(cf)};
   S.offline=false;render();
+  automaticos().catch(x=>console.error('automáticos',x));
+}
+/* impostos do mês atual e do próximo aparecem sozinhos; o DAS acompanha as notas até ser pago */
+async function automaticos(){
+  if(!S.canWrite||S.semAcesso)return;
+  const d=new Date();
+  for(const n of[0,1]){const p=addM(d.getFullYear(),d.getMonth()+1,n);
+    for(const x of modelosDoMes(p.y,p.m)){if(S.obrig.some(o=>o.id===x.id))continue;const dd={...x};delete dd.id;await put('obrigacoes',x.id,dd)}}
+  await atualizarDas();
+}
+async function atualizarDas(){
+  if(!S.canWrite)return;
+  for(const o of S.obrig){
+    if(o.status==='pago'||o.modeloId!=='das'||!o.competencia)continue;
+    if(!o.calculado&&+o.valor)continue; // valor digitado à mão (ex.: do PGDAS) fica como está
+    const v=r2(faturado(o.competencia)*(+S.config.aliquota||0)/100);
+    if(v!==+o.valor||!o.calculado){const dd={...o,valor:v,calculado:true};delete dd.id;await put('obrigacoes',o.id,dd)}
+  }
 }
 async function entrou(session){
   document.getElementById('login').hidden=true;
