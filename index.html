@@ -583,16 +583,58 @@ function vBeneficios(){
       <div><span><b>13º salário</b><span class="op">soma ÷ meses</span></span><span class="big">${brl(c.dec)}</span></div>
       <div><span>+ 1/3 de férias<span class="op">13º ÷ 3</span></span><b>${brl(c.terco)}</b></div>
       <div><span><b>Férias</b><span class="op">13º + 1/3</span></span><span class="big pos">${brl(c.fer)}</span></div>
+      <div><span>− DAS que fica na conta<span class="op">${aliqTxt()} do 13º e das férias</span></span><b>− ${brl(dasDe(c.dec)+dasDe(c.fer))}</b></div>
+      <div><span><b>Livre</b><span class="op">13º ${brl(semDas(c.dec))} + férias ${brl(semDas(c.fer))}</span></span><span class="big pos">${brl(semDas(c.dec)+semDas(c.fer))}</span></div>
       <div><span><b>Total a reservar</b><span class="op">13º + férias</span></span><span class="big">${brl(c.total)}</span></div>
       <div><span>Guardar por mês<span class="op">total ÷ 12</span></span><b>${brl(c.total/12)}</b></div>
     </div>
   </div></section>`;
 }
 
-/* resumo do fim de ano: 13º e férias da PJ + CLT (líquido) */
+/* impostos que ficam na conta: o DAS de cada competência sai do que a PJ recebe */
+const aliq=()=>(+S.config.aliquota||0)/100;
+const aliqTxt=()=>String(S.config.aliquota||0).replace('.',',')+'%';
+const dasDe=v=>r2((+v||0)*aliq());
+const semDas=v=>r2((+v||0)-dasDe(v));
+const dasDaComp=k=>S.obrig.find(o=>o.competencia===k&&(o.modeloId==='das'||/^das\b/i.test(o.nome||'')));
+function impostosNaConta(){
+  const comps=[...new Set(S.notas.filter(n=>n.status!=='cancelada'&&n.dataEmissao).map(n=>n.dataEmissao.slice(0,7)))].sort();
+  const linhas=comps.map(k=>{
+    const fat=faturado(k),o=dasDaComp(k),[y,m]=k.split('-').map(Number),p=addM(y,m,1);
+    const recebido=S.notas.filter(n=>n.status==='recebida'&&inMonth(n.dataEmissao,k)).reduce((a,n)=>a+(+n.valor||0),0);
+    const venc=o?o.vencimento:ajustar(iso(p.y,p.m,20),'proximo');
+    const valor=o&&+o.valor?+o.valor:dasDe(fat);
+    // sem obrigação lançada e já vencido: foi pago fora do painel
+    const sit=o?(o.status==='pago'?'pago':'conta'):(venc<hoje()?'fora':'conta');
+    return{k,fat,recebido,valor:r2(valor),venc,sit,est:!o||!!o.calculado,o};
+  });
+  const naConta=linhas.filter(l=>l.sit==='conta');
+  const total=r2(naConta.reduce((a,l)=>a+l.valor,0)),recebido=r2(naConta.reduce((a,l)=>a+l.recebido,0));
+  return{linhas,naConta,total,recebido,livre:r2(recebido-total)};
+}
+function vImpostosConta(){
+  const r=impostosNaConta();
+  if(!r.linhas.length)return'';
+  const sitTxt=l=>l.sit==='pago'?`<span class="pill ok">Pago${l.o&&l.o.pagoEm?' '+fmtD(l.o.pagoEm).slice(0,5):''}</span>`:l.sit==='fora'?'<span class="pill off" title="Não há DAS lançado no painel para este mês">Pago fora do painel</span>':`<span class="pill ${l.venc<hoje()?'late':'wait'}">Deixar na conta</span>`;
+  const linhas=r.linhas.filter(l=>l.sit==='conta'||l.k.slice(0,4)===String(S.ref.y));
+  return `<div class="panel">
+    <div class="ph"><h2>Impostos na conta</h2><span class="hint">DAS de ${aliqTxt()} sobre cada nota</span></div>
+    <section class="kpis" style="margin:0 0 14px">
+      <div class="kpi"><div class="lbl">Recebido das notas</div><div class="val">${brl(r.recebido)}</div><div class="sub">dos meses com DAS em aberto</div></div>
+      <div class="kpi hl"><div class="lbl">Deixe na conta</div><div class="val">${brl(r.total)}</div><div class="sub">${r.naConta.length} DAS a pagar</div></div>
+      <div class="kpi"><div class="lbl">Livre para usar</div><div class="val pos">${brl(r.livre)}</div><div class="sub">recebido menos o imposto</div></div>
+    </section>
+    <div class="tw"><table><thead><tr><th>Notas de</th><th class="num">Faturado</th><th class="num">DAS</th><th class="num">Livre</th><th>Vence</th><th>Situação</th></tr></thead><tbody>
+    ${linhas.map(l=>`<tr style="${l.sit==='conta'?'':'opacity:.6'}"><td><b>${fmtYM(l.k)}</b></td><td class="num">${brl(l.fat)}</td><td class="num"><b>${brl(l.valor)}</b>${l.est?'<div class="muted">estimado</div>':''}</td><td class="num">${brl(l.fat-l.valor)}</td><td>${fmtD(l.venc).slice(0,5)}</td><td>${sitTxt(l)}</td></tr>`).join('')}
+    </tbody><tfoot><tr><td colspan="2">Total para deixar na conta</td><td class="num">${brl(r.total)}</td><td colspan="3"></td></tr></tfoot></table></div>
+    <p class="note" style="margin:12px 0 0">Cada nota recebida já mostra o valor livre, sem o DAS. Quando você marca o DAS como pago, ele sai desta conta. O valor estimado usa a alíquota de ${aliqTxt()}; confira no PGDAS-D antes de pagar.</p>
+  </div>`;
+}
+
+/* resumo do fim de ano: 13º e férias da PJ (sem o DAS) + CLT (líquido) */
 function resumoAno(y){
   const pj=calcBenef(y),clt=cltCalc(y),temPj=pj.n>0,temClt=!!clt&&clt.n>0;
-  const decPj=temPj?pj.dec:0,ferPj=temPj?pj.fer:0,decClt=temClt?clt.l13.liq:0,ferClt=temClt?clt.lFer.liq:0;
+  const decPj=temPj?semDas(pj.dec):0,ferPj=temPj?semDas(pj.fer):0,decClt=temClt?clt.l13.liq:0,ferClt=temClt?clt.lFer.liq:0;
   return{pj,clt,temPj,temClt,decPj,ferPj,decClt,ferClt,dec:decPj+decClt,fer:ferPj+ferClt,tot:decPj+decClt+ferPj+ferClt};
 }
 // o que ainda falta pagar até 31/12: impostos e contas em aberto + os dos meses que ainda não foram gerados
@@ -618,7 +660,7 @@ function vResumoAno(){
   const blocoPg=pg.itens.length?`<div class="rcol full"><h3>O que você vai pagar até dezembro</h3>
       ${pg.itens.map(i=>`<div class="rp"><time>${fmtD(i.d).slice(0,5)}</time><span>${esc(i.n)}<small>${i.k}${i.est?' · estimado':''}${i.d<hoje()?' · vencido':''}</small></span><b>${i.v?brl(i.v):'<small>a definir</small>'}</b></div>`).join('')}
       <div class="rl tot"><span>Total a pagar</span><b>${brl(pg.total)}</b></div></div>`:'';
-  const subPj=r.temPj?`média de ${r.pj.n} ${r.pj.n===1?'mês':'meses'}, sem desconto`:'sem recebimentos lançados';
+  const subPj=r.temPj?`sem o DAS de ${aliqTxt()} · média de ${r.pj.n} ${r.pj.n===1?'mês':'meses'}`:'sem recebimentos lançados';
   return `<section class="resumo" aria-label="Resumo de 13º e férias de ${y}">
     <div class="rh"><div><span class="spaced">Seu fim de ano</span><h2>O que você vai receber em ${y}</h2></div><div class="rt"><small>Total</small><b>${brl(r.tot)}</b></div></div>
     <p class="frase">${frase}</p>
@@ -634,7 +676,7 @@ function vResumoAno(){
       ${blocoPg}
     </div>
     <div class="rfoot"><button class="btn ghost sm" data-go="beneficios">Ver PJ</button><button class="btn ghost sm" data-go="clt">Ver CLT</button>
-      <span>${r.temClt?`13º da CLT: 1ª parcela de ${brl(r.clt.parc1)} até 30/11 e 2ª de ${brl(r.clt.parc2)} até 20/12. `:''}A CLT já vem com INSS e IR descontados; a PJ não tem desconto.</span></div>
+      <span>${r.temClt?`13º da CLT: 1ª parcela de ${brl(r.clt.parc1)} até 30/11 e 2ª de ${brl(r.clt.parc2)} até 20/12. `:''}A CLT já vem com INSS e IR descontados; a PJ, sem o DAS de ${aliqTxt()} que fica na conta.</span></div>
   </section>`;
 }
 function vGeral(){
@@ -653,6 +695,7 @@ function vGeral(){
     <div class="kpi"><div class="lbl">A pagar</div><div class="val ${aPagar?'neg':''}">${brl(aPagar)}</div><div class="sub">${abertos.length} obrigaç${abertos.length===1?'ão':'ões'} em aberto</div></div>
   </section>
   ${vResumoAno()}
+  ${vImpostosConta()}
   <section class="grid2">
     <div class="panel">
       <div class="ph"><h2>Entradas e saídas, últimos 6 meses</h2><div class="legend"><span><i style="background:var(--teal)"></i>Entradas</span><span><i style="background:var(--pink)"></i>Saídas</span></div></div>
@@ -721,7 +764,7 @@ function vLanc(){
         <button class="btn primary sm" data-act="novoLanc" ${S.canWrite?'':'disabled'}>+ Novo lançamento</button>
       </div></div>
     ${rows.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
-    ${rows.map(l=>`<tr><td>${fmtD(l.data).slice(0,5)}</td><td>${esc(l.descricao)}${l.origem==='nota'?'<span class="tag">nota fiscal</span>':l.origem==='obrigacao'?'<span class="tag">imposto</span>':l.origem==='fixa'?'<span class="tag">conta fixa</span>':''}${l.contaBeneficio&&l.tipo==='entrada'?'<span class="tag" style="color:var(--pink-ink);border-color:var(--pink)" title="Conta para a média do 13º e das férias">13º e férias</span>':''}${l.obs?`<div class="muted">${esc(l.obs)}</div>`:''}</td><td><span class="muted">${esc(l.categoria||'—')}</span></td>
+    ${rows.map(l=>`<tr><td>${fmtD(l.data).slice(0,5)}</td><td>${esc(l.descricao)}${l.origem==='nota'?'<span class="tag">nota fiscal</span>':l.origem==='obrigacao'?'<span class="tag">imposto</span>':l.origem==='fixa'?'<span class="tag">conta fixa</span>':''}${l.contaBeneficio&&l.tipo==='entrada'?'<span class="tag" style="color:var(--pink-ink);border-color:var(--pink)" title="Conta para a média do 13º e das férias">13º e férias</span>':''}${l.obs?`<div class="muted">${esc(l.obs)}</div>`:''}${l.origem==='nota'&&l.tipo==='entrada'?`<div class="muted">${brl(dasDe(l.valor))} fica na conta para o DAS · livre ${brl(semDas(l.valor))}</div>`:''}</td><td><span class="muted">${esc(l.categoria||'—')}</span></td>
       <td class="num"><span class="dir ${l.tipo==='entrada'?'in':'out'}">${l.tipo==='entrada'?'+':'−'} ${brl(l.valor)}</span></td>
       <td>${l.status==='pendente'?`<span class="pill wait">${l.tipo==='entrada'?'A receber':'A pagar'}</span>`:`<span class="pill ok">${l.tipo==='entrada'?'Recebido':'Pago'}</span>`}</td>
       <td class="acts">${acts('Lanc',l.id)}</td></tr>`).join('')}
@@ -765,12 +808,13 @@ function vNotas(){
   </section>
   <div class="panel">
     <div class="ph"><h2>Notas emitidas em ${MESES[S.ref.m-1]}</h2><div class="toolbar"><button class="btn primary sm" data-act="novaNota" ${S.canWrite?'':'disabled'}>+ Cadastrar nota</button></div></div>
-    ${rows.length?`<div class="tw"><table><thead><tr><th>Nº</th><th>Emissão</th><th>Cliente</th><th>Serviço</th><th class="num">Valor</th><th class="num">ISS retido</th><th>Recebimento</th><th></th></tr></thead><tbody>
-    ${rows.map(n=>`<tr><td><b>${esc(n.numero)}</b></td><td>${fmtD(n.dataEmissao).slice(0,5)}</td><td>${esc(n.cliente)}${n.documento?`<div class="muted">${esc(n.documento)}</div>`:''}</td><td><span class="muted">${esc(n.servico||'—')}</span></td>
+    ${rows.length?`<div class="tw"><table><thead><tr><th>Nº</th><th>Emissão</th><th>Cliente</th><th>Serviço</th><th class="num">Valor</th><th class="num">ISS retido</th><th class="num">DAS na conta</th><th class="num">Livre</th><th>Recebimento</th><th></th></tr></thead><tbody>
+    ${rows.map(n=>{const c=n.status==='cancelada',d=c?0:dasDe(n.valor);return`<tr><td><b>${esc(n.numero)}</b></td><td>${fmtD(n.dataEmissao).slice(0,5)}</td><td>${esc(n.cliente)}${n.documento?`<div class="muted">${esc(n.documento)}</div>`:''}</td><td><span class="muted">${esc(n.servico||'—')}</span></td>
     <td class="num"><b>${brl(n.valor)}</b></td><td class="num">${+n.issRetido?brl(n.issRetido):'<span class="muted">—</span>'}</td>
+    <td class="num">${c?'<span class="muted">—</span>':'− '+brl(d)}</td><td class="num">${c?'<span class="muted">—</span>':`<b class="pos">${brl((+n.valor||0)-(+n.issRetido||0)-d)}</b>`}</td>
     <td>${nfPill(n)}<div class="muted">${n.status==='recebida'?'em '+fmtD(n.recebidoEm):n.vencimento&&n.status!=='cancelada'?'previsto '+fmtD(n.vencimento):''}</div></td>
-    <td class="acts">${['areceber','atrasada'].includes(nfStatus(n))&&S.canWrite?`<button class="btn sm teal" data-act="receberNota" data-id="${n.id}">Recebi</button>`:''}${acts('Nota',n.id)}</td></tr>`).join('')}
-    </tbody><tfoot><tr><td colspan="4">Total válido</td><td class="num">${brl(fat)}</td><td class="num">${brl(ret)}</td><td colspan="2"></td></tr></tfoot></table></div>`
+    <td class="acts">${['areceber','atrasada'].includes(nfStatus(n))&&S.canWrite?`<button class="btn sm teal" data-act="receberNota" data-id="${n.id}">Recebi</button>`:''}${acts('Nota',n.id)}</td></tr>`}).join('')}
+    </tbody><tfoot><tr><td colspan="4">Total válido</td><td class="num">${brl(fat)}</td><td class="num">${brl(ret)}</td><td class="num">− ${brl(dasDe(fat))}</td><td class="num">${brl(fat-ret-dasDe(fat))}</td><td colspan="2"></td></tr></tfoot></table></div>`
     :`<div class="empty"><b>Nenhuma nota emitida em ${MESES[S.ref.m-1]}</b>Cadastre cada nota fiscal de serviço emitida. Ao marcar “Recebi”, o valor entra sozinho nas entradas.</div>`}
   </div>
   ${abertas.filter(n=>!inMonth(n.dataEmissao,k)).length?`<div class="panel"><div class="ph"><h2>Notas de outros meses ainda em aberto</h2></div><div class="tw"><table><thead><tr><th>Nº</th><th>Emissão</th><th>Cliente</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
@@ -796,6 +840,7 @@ function vImpostos(){
     <div class="kpi hl"><div class="lbl">Falta pagar</div><div class="val">${brl(tot-pago)}</div><div class="sub">neste mês</div></div>
     <div class="kpi"><div class="lbl">Vencidas</div><div class="val ${S.obrig.some(o=>obStatus(o)==='vencido')?'neg':''}">${S.obrig.filter(o=>obStatus(o)==='vencido').length}</div><div class="sub">de qualquer mês</div></div>
   </section>
+  ${vImpostosConta()}
   ${atras.length?`<div class="panel" style="border-color:var(--bad)"><div class="ph"><h2 class="neg">Vencidas de meses anteriores</h2><span class="hint">pague com multa e juros pelo programa da Receita</span></div>${tabela(atras)}</div>`:''}
   <div class="panel">
     <div class="ph"><h2>Obrigações que vencem em ${MESES[S.ref.m-1]}</h2><div class="toolbar">
