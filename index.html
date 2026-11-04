@@ -366,20 +366,30 @@ function benefMeses(y){return(S.benef[String(y)]||{}).meses||{}}
 const dia5=s=>!!s&&s.slice(8,10)==='05';
 // só o recebimento marcado (o do dia 5) entra na base do 13º e das férias
 function entradasMes(k){return S.lanc.filter(l=>l.tipo==='entrada'&&l.status!=='pendente'&&l.contaBeneficio===true&&inMonth(l.data,k)).reduce((a,l)=>a+(+l.valor||0),0)}
+// primeiro mês do ano que conta: antes do início da PJ nada entra (2026 começa em abril)
+function mesInicial(y){
+  const s=S.config.inicioPj;if(!s)return 1;
+  const[iy,im]=s.split('-').map(Number);
+  return y<iy?13:y===iy?im:1;
+}
 function calcBenef(y){
-  const ms=benefMeses(y);const vals=MESES.map((_,i)=>+ms[pad(i+1)]||0);
+  const ini=mesInicial(y),ms=benefMeses(y);
+  const vals=MESES.map((_,i)=>i+1>=ini?(+ms[pad(i+1)]||0):0);
   const n=vals.filter(v=>v>0).length,soma=vals.reduce((a,b)=>a+b,0);
   const dec=n?soma/n:0,terco=dec/3,fer=dec+terco;
-  return{vals,n,soma,dec,terco,fer,total:dec+fer};
+  return{ini,vals,n,soma,dec,terco,fer,total:dec+fer};
 }
 function vBeneficios(){
   const y=S.ref.y,c=calcBenef(y);
-  const vazios=MESES.filter((_,i)=>!c.vals[i]&&entradasMes(ym(y,i+1))>0).length;
+  const vazios=MESES.filter((_,i)=>i+1>=c.ini&&!c.vals[i]&&entradasMes(ym(y,i+1))>0).length;
   const dis=S.canWrite?'':'disabled';
+  const possiveis=Math.max(0,13-c.ini);
+  const inicioTxt=S.config.inicioPj?`${MESES[+S.config.inicioPj.slice(5)-1]} de ${S.config.inicioPj.slice(0,4)}`:'';
   return `
+  ${c.ini>1?`<div class="banner" style="background:var(--pink-soft);color:var(--pink-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${c.ini>12?`A PJ começou em ${inicioTxt}. Nada de ${y} entra no 13º e nas férias.`:`Em ${y} a conta começa em <b>${MESES[c.ini-1]}</b>, quando a PJ começou. Os meses anteriores ficam fora.`}</span><button class="btn ghost sm" data-act="inicio" ${dis}>Alterar início da PJ</button></div>`:''}
   <section class="kpis">
     <div class="kpi"><div class="lbl">Recebido em ${y}</div><div class="val">${brl(c.soma)}</div><div class="sub">soma dos meses lançados</div></div>
-    <div class="kpi"><div class="lbl">Meses lançados</div><div class="val">${c.n}</div><div class="sub">de 12</div></div>
+    <div class="kpi"><div class="lbl">Meses lançados</div><div class="val">${c.n}</div><div class="sub">de ${possiveis}${c.ini>1&&c.ini<=12?` (${MESES[c.ini-1].slice(0,3)} a dez)`:''}</div></div>
     <div class="kpi hl"><div class="lbl">13º salário</div><div class="val">${brl(c.dec)}</div><div class="sub">média mensal</div></div>
     <div class="kpi"><div class="lbl">Férias + 1/3</div><div class="val pos">${brl(c.fer)}</div><div class="sub">média + ${brl(c.terco)}</div></div>
   </section>
@@ -388,7 +398,9 @@ function vBeneficios(){
     <div class="ph"><h2>Valores recebidos pela PJ em ${y}</h2>
       <button class="btn sm" data-act="preencherBenef" ${S.canWrite&&vazios?'':'disabled'} title="Copia, para cada mês vazio, as entradas marcadas como “Conta para 13º e férias”">${vazios?`Puxar o recebimento do dia 5 (${vazios} ${vazios>1?'meses':'mês'})`:'Nada para puxar do dia 5'}</button></div>
     <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Valor recebido</th><th class="num">Recebido no dia 5</th></tr></thead><tbody>
-    ${MESES.map((m,i)=>{const k=pad(i+1),v=c.vals[i],e=entradasMes(ym(y,i+1));return`<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td>
+    ${MESES.map((m,i)=>{const k=pad(i+1),v=c.vals[i],e=entradasMes(ym(y,i+1));
+      if(i+1<c.ini)return`<tr class="zero"><td style="text-transform:capitalize">${m}</td><td class="num"><span class="muted">antes da PJ</span></td><td class="num"><span class="muted">—</span></td></tr>`;
+      return`<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td>
       <td class="num"><input id="bm-${y}-${k}" data-bm="${k}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Valor recebido em ${m}" ${dis}></td>
       <td class="num"><span class="muted">${e?brl(e):'—'}</span></td></tr>`}).join('')}
     </tbody><tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td><td></td></tr></tfoot></table></div>
@@ -398,7 +410,7 @@ function vBeneficios(){
   <div class="panel">
     <div class="ph"><h2>Como o cálculo é feito</h2></div>
     <div class="calc">
-      <div><span>Soma do ano<span class="op">todos os meses lançados</span></span><b>${brl(c.soma)}</b></div>
+      <div><span>Soma do ano<span class="op">${c.ini>1&&c.ini<=12?`de ${MESES[c.ini-1]} a dezembro`:'todos os meses lançados'}</span></span><b>${brl(c.soma)}</b></div>
       <div><span>÷ número de meses<span class="op">meses com valor</span></span><b>${c.n}</b></div>
       <div><span><b>13º salário</b><span class="op">soma ÷ meses</span></span><span class="big">${brl(c.dec)}</span></div>
       <div><span>+ 1/3 de férias<span class="op">13º ÷ 3</span></span><b>${brl(c.terco)}</b></div>
@@ -661,7 +673,9 @@ const F={
     {k:'ativo',l:'Ativa',type:'check'}]},
   config:{t:'cálculo do DAS',f:[
     {k:'aliquota',l:'Alíquota efetiva (%)',type:'money',req:1,help:'Veja no último PGDAS-D'},
-    {k:'anexo',l:'Enquadramento',type:'text',ph:'Ex.: Simples Nacional – Anexo III'}]}
+    {k:'anexo',l:'Enquadramento',type:'text',ph:'Ex.: Simples Nacional – Anexo III'}]},
+  inicio:{t:'início da PJ',f:[
+    {k:'inicioPj',l:'Mês em que a PJ começou',type:'month',req:1,full:1,help:'Meses anteriores não entram no 13º e nas férias. Nos anos seguintes a conta começa em janeiro.'}]}
 };
 let modal=null;
 function openForm(kind,rec,defaults){
@@ -739,7 +753,7 @@ async function del(col,id){
 const newId=()=>(crypto.randomUUID?crypto.randomUUID():'x'+Date.now()+Math.random().toString(36).slice(2));
 
 async function save(kind,rec,out){
-  if(kind==='config'){await put('config','empresa',{aliquota:S.config.aliquota,anexo:S.config.anexo,...out});return}
+  if(kind==='config'||kind==='inicio'){await put('config','empresa',{aliquota:S.config.aliquota,anexo:S.config.anexo,inicioPj:S.config.inicioPj,...out});return}
   const spec=F[kind];const id=rec?.id||newId(spec.col);
   const base={...(rec||{})};delete base.id;
   const data={...base,...out,atualizadoEm:new Date().toISOString()};
@@ -782,8 +796,9 @@ async function act(a,id,btn){
     case'receberNota':{const n={...N,status:'recebida',recebidoEm:hoje()};delete n.id;await put('notas',id,n);await syncNota({...n,id});return toast(`NF ${N.numero} recebida e lançada nas entradas`)}
     case'gerar':{const novos=modelosDoMes(S.ref.y,S.ref.m).filter(x=>!S.obrig.some(o=>o.id===x.id));for(const x of novos){const d={...x};delete d.id;await put('obrigacoes',x.id,d)}return toast(`${novos.length} obrigaç${novos.length===1?'ão criada':'ões criadas'}`)}
     case'csv':return exportCSV();
+    case'inicio':return openForm('inicio',S.config);
     case'preencherBenef':{const y=S.ref.y,meses={...benefMeses(y)};let n=0;
-      for(let i=1;i<=12;i++){const k=pad(i);if(+meses[k])continue;const e=entradasMes(ym(y,i));if(e>0){meses[k]=Math.round(e*100)/100;n++}}
+      for(let i=mesInicial(y);i<=12;i++){const k=pad(i);if(+meses[k])continue;const e=entradasMes(ym(y,i));if(e>0){meses[k]=Math.round(e*100)/100;n++}}
       await put('beneficios',String(y),{ano:y,meses,atualizadoEm:new Date().toISOString()});return toast(`${n} ${n===1?'mês preenchido':'meses preenchidos'} com as entradas`)}
   }
   if(a.startsWith('del')){
