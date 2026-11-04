@@ -553,7 +553,7 @@ function vLanc(){
         <button class="btn primary sm" data-act="novoLanc" ${S.canWrite?'':'disabled'}>+ Novo lançamento</button>
       </div></div>
     ${rows.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
-    ${rows.map(l=>`<tr><td>${fmtD(l.data).slice(0,5)}</td><td>${esc(l.descricao)}${l.origem==='nota'?'<span class="tag">nota fiscal</span>':l.origem==='obrigacao'?'<span class="tag">imposto</span>':''}${l.contaBeneficio&&l.tipo==='entrada'?'<span class="tag" style="color:var(--pink-ink);border-color:var(--pink)" title="Conta para a média do 13º e das férias">13º e férias</span>':''}${l.obs?`<div class="muted">${esc(l.obs)}</div>`:''}</td><td><span class="muted">${esc(l.categoria||'—')}</span></td>
+    ${rows.map(l=>`<tr><td>${fmtD(l.data).slice(0,5)}</td><td>${esc(l.descricao)}${l.origem==='nota'?'<span class="tag">nota fiscal</span>':l.origem==='obrigacao'?'<span class="tag">imposto</span>':l.origem==='fixa'?'<span class="tag">conta fixa</span>':''}${l.contaBeneficio&&l.tipo==='entrada'?'<span class="tag" style="color:var(--pink-ink);border-color:var(--pink)" title="Conta para a média do 13º e das férias">13º e férias</span>':''}${l.obs?`<div class="muted">${esc(l.obs)}</div>`:''}</td><td><span class="muted">${esc(l.categoria||'—')}</span></td>
       <td class="num"><span class="dir ${l.tipo==='entrada'?'in':'out'}">${l.tipo==='entrada'?'+':'−'} ${brl(l.valor)}</span></td>
       <td>${l.status==='pendente'?`<span class="pill wait">${l.tipo==='entrada'?'A receber':'A pagar'}</span>`:`<span class="pill ok">${l.tipo==='entrada'?'Recebido':'Pago'}</span>`}</td>
       <td class="acts">${acts('Lanc',l.id)}</td></tr>`).join('')}
@@ -562,7 +562,24 @@ function vLanc(){
   <div class="panel">
     <div class="ph"><h2>Para onde foi o dinheiro</h2><span class="hint">saídas pagas</span></div>
     ${cats.length?`<div style="display:grid;gap:10px">${cats.map(([c,v])=>`<div><div style="display:flex;justify-content:space-between;gap:8px;font-size:14px"><span>${esc(c)}</span><b>${brl(v)}</b></div><div style="height:8px;background:var(--surface-2);border-radius:4px;margin-top:4px"><div style="height:100%;width:${v/cmax*100}%;background:var(--pink);border-radius:4px"></div></div></div>`).join('')}</div>`:`<div class="empty">As saídas pagas do mês aparecem aqui, agrupadas por categoria.</div>`}
-  </div></section>`;
+  </div></section>
+  ${vFixas()}`;
+}
+function vFixas(){
+  const lista=fixas(),faltam=fixasDoMes(S.ref.y,S.ref.m).filter(x=>!S.lanc.some(l=>l.id===x.id)).length;
+  const totalMes=lista.filter(md=>md.ativo!==false&&md.periodicidade!=='anual').reduce((a,md)=>a+(+md.valorPadrao||0),0);
+  return `<div class="panel">
+    <div class="ph"><h2>Contas fixas</h2><div class="toolbar">
+      <span class="hint">${lista.length?`${brl(totalMes)} por mês`:''}</span>
+      <button class="btn sm" data-act="gerarFixas" ${S.canWrite&&faltam?'':'disabled'} title="Cria as contas fixas deste mês como saídas a pagar">${faltam?`Gerar ${faltam} de ${MESES[S.ref.m-1]}`:lista.length?`${MESES[S.ref.m-1][0].toUpperCase()+MESES[S.ref.m-1].slice(1)} já gerado`:'Gerar do mês'}</button>
+      <button class="btn primary sm" data-act="novaFixa" ${S.canWrite?'':'disabled'}>+ Conta fixa</button></div></div>
+    ${lista.length?`<div class="tw"><table><thead><tr><th>Conta</th><th>Vence</th><th>Categoria</th><th class="num">Valor</th><th>${MESES[S.ref.m-1]}</th><th></th></tr></thead><tbody>
+    ${lista.map(md=>{const l=S.lanc.find(x=>x.id===`${md.id}-${refYM()}`);
+      const sit=md.ativo===false?'<span class="pill off">Pausada</span>':!l?'<span class="muted">não gerada</span>':l.status==='pago'?'<span class="pill ok">Paga</span>':`<span class="pill ${l.data<hoje()?'late':'wait'}">A pagar ${fmtD(l.data).slice(0,5)}</span>`;
+      return `<tr style="${md.ativo===false?'opacity:.55':''}"><td><b>${esc(md.nome)}</b>${md.obs?`<div class="muted">${esc(md.obs)}</div>`:''}</td><td>${md.periodicidade==='anual'?`${pad(md.dia)}/${pad(md.mes)} todo ano`:`dia ${md.dia}`}</td><td><span class="muted">${esc(md.categoria||'Outras saídas')}</span></td>
+      <td class="num">${+md.valorPadrao?`<b>${brl(md.valorPadrao)}</b>`:'<span class="muted">a definir</span>'}</td><td>${sit}</td><td class="acts">${acts('Fixa',md.id)}</td></tr>`}).join('')}
+    </tbody></table></div>`:`<div class="empty"><b>Nenhuma conta fixa ainda</b>Cadastre o que se repete todo mês, como escritório virtual, softwares e contador. Depois, a cada mês, um clique em “Gerar” cria as saídas a pagar.</div>`}
+  </div>`;
 }
 function acts(kind,id){if(!S.canWrite)return'';return`<button class="btn ghost sm" data-act="edit${kind}" data-id="${id}">Editar</button><button class="btn ghost sm danger" data-act="del${kind}" data-id="${id}">Excluir</button>`}
 
@@ -621,8 +638,8 @@ function vImpostos(){
   <section class="grid2">
   <div class="panel">
     <div class="ph"><h2>Obrigações recorrentes</h2><button class="btn sm" data-act="novoModelo" ${S.canWrite?'':'disabled'}>+ Recorrente</button></div>
-    ${S.modelos.length?`<div class="tw"><table><thead><tr><th>Obrigação</th><th>Quando</th><th>Se cair em feriado</th><th class="num">Valor</th><th></th></tr></thead><tbody>
-    ${[...S.modelos].sort((a,b)=>(a.ordem??99)-(b.ordem??99)).map(m=>`<tr style="${m.ativo===false?'opacity:.5':''}"><td><b>${esc(m.nome)}</b>${m.ativo===false?'<span class="tag">pausada</span>':''}</td><td>${m.periodicidade==='anual'?`${pad(m.dia)}/${pad(m.mes)} todo ano`:`dia ${m.dia} todo mês`}</td><td><span class="muted">${m.ajuste==='anterior'?'antecipa':'adia'}</span></td>
+    ${S.modelos.some(m=>m.tipo!=='despesa')?`<div class="tw"><table><thead><tr><th>Obrigação</th><th>Quando</th><th>Se cair em feriado</th><th class="num">Valor</th><th></th></tr></thead><tbody>
+    ${S.modelos.filter(m=>m.tipo!=='despesa').sort((a,b)=>(a.ordem??99)-(b.ordem??99)).map(m=>`<tr style="${m.ativo===false?'opacity:.5':''}"><td><b>${esc(m.nome)}</b>${m.ativo===false?'<span class="tag">pausada</span>':''}</td><td>${m.periodicidade==='anual'?`${pad(m.dia)}/${pad(m.mes)} todo ano`:`dia ${m.dia} todo mês`}</td><td><span class="muted">${m.ajuste==='anterior'?'antecipa':'adia'}</span></td>
     <td class="num">${m.calculo==='das'?'<span class="muted">calculado das notas</span>':+m.valorPadrao?brl(m.valorPadrao):'<span class="muted">a definir</span>'}</td><td class="acts">${acts('Modelo',m.id)}</td></tr>`).join('')}</tbody></table></div>`
     :`<div class="empty">Cadastre as obrigações que se repetem, como DAS e INSS do pró-labore, para gerá-las com um clique a cada mês.</div>`}
   </div>
@@ -670,7 +687,7 @@ function vCal(){
 /* ---------- recorrentes ---------- */
 function modelosDoMes(y,m){
   const out=[];
-  for(const md of S.modelos){if(md.ativo===false)continue;
+  for(const md of S.modelos){if(md.ativo===false||md.tipo==='despesa')continue;
     if(md.periodicidade==='anual'&&+md.mes!==m)continue;
     const dia=Math.min(+md.dia||20,daysIn(y,m));const orig=iso(y,m,dia);const venc=ajustar(orig,md.ajuste);
     const comp=md.periodicidade==='anual'?String(y-1):(()=>{const p=addM(y,m,-1);return ym(p.y,p.m)})();
@@ -679,6 +696,14 @@ function modelosDoMes(y,m){
     out.push({id:`${md.id}-${ym(y,m)}`,nome:md.nome,competencia:md.periodicidade==='anual'?`${y-1}-12`:comp,vencimento:venc,ajustado:venc!==orig?orig:'',valor,calculado,status:'pendente',modeloId:md.id,obs:md.obs||''});
   }
   return out;
+}
+/* contas fixas (escritório virtual, softwares…): viram saídas a pagar no mês */
+const fixas=()=>S.modelos.filter(md=>md.tipo==='despesa').sort((a,b)=>(+a.dia||0)-(+b.dia||0)||String(a.nome).localeCompare(b.nome));
+function fixasDoMes(y,m){
+  return fixas().filter(md=>md.ativo!==false&&(md.periodicidade!=='anual'||+md.mes===m)).map(md=>{
+    const orig=iso(y,m,Math.min(+md.dia||10,daysIn(y,m)));
+    return{id:`${md.id}-${ym(y,m)}`,tipo:'saida',data:ajustar(orig,md.ajuste),descricao:md.nome,categoria:md.categoria||'Outras saídas',valor:+md.valorPadrao||0,status:'pendente',origem:'fixa',origemId:md.id,obs:md.obs||''};
+  });
 }
 
 /* ---------- formulários ---------- */
@@ -711,6 +736,16 @@ const F={
     {k:'status',l:'Situação',type:'select',opts:[['pendente','A pagar'],['pago','Pago']]},
     {k:'pagoEm',l:'Pago em',type:'date'},
     {k:'obs',l:'Observação',type:'text',full:1,ph:'Ex.: código de barras, nº do DARF'}]},
+  fixa:{t:'conta fixa',col:'modelos',f:[
+    {k:'nome',l:'Nome da conta',type:'text',req:1,full:1,ph:'Ex.: Escritório virtual'},
+    {k:'valorPadrao',l:'Valor (R$)',type:'money',req:1},
+    {k:'dia',l:'Dia do vencimento',type:'number',req:1},
+    {k:'categoria',l:'Categoria',type:'list',list:()=>CAT_OUT},
+    {k:'periodicidade',l:'Repete',type:'select',opts:[['mensal','Todo mês'],['anual','Todo ano']]},
+    {k:'mes',l:'Mês (se anual)',type:'number',help:'1 a 12'},
+    {k:'ajuste',l:'Se cair em fim de semana ou feriado',type:'select',full:1,opts:[['proximo','Vence no próximo dia útil'],['anterior','Vence no dia útil anterior']]},
+    {k:'obs',l:'Observação',type:'text',full:1,ph:'Ex.: boleto por e-mail, débito automático'},
+    {k:'ativo',l:'Ativa',type:'check'}]},
   modelo:{t:'obrigação recorrente',col:'modelos',f:[
     {k:'nome',l:'Nome',type:'text',req:1,full:1},
     {k:'periodicidade',l:'Repete',type:'select',opts:[['mensal','Todo mês'],['anual','Todo ano']]},
@@ -812,6 +847,7 @@ async function save(kind,rec,out){
   const spec=F[kind];const id=rec?.id||newId(spec.col);
   const base={...(rec||{})};delete base.id;
   const data={...base,...out,atualizadoEm:new Date().toISOString()};
+  if(kind==='fixa'){data.tipo='despesa';data.calculo='fixo'}
   if(kind==='nota'){if(data.status==='recebida'&&!data.recebidoEm)data.recebidoEm=hoje();if(data.status!=='recebida')data.recebidoEm=''}
   if(kind==='ob'){if(data.status==='pago'&&!data.pagoEm)data.pagoEm=hoje();if(data.status!=='pago')data.pagoEm='';if(rec&&+rec.valor!==+data.valor)data.calculado=false}
   await put(spec.col,id,data);
@@ -843,6 +879,9 @@ async function act(a,id,btn){
     case'novoOb':return openForm('ob',null,{competencia:(()=>{const p=addM(S.ref.y,S.ref.m,-1);return ym(p.y,p.m)})(),vencimento:iso(S.ref.y,S.ref.m,20),status:'pendente'});
     case'editOb':return openForm('ob',O);
     case'novoModelo':return openForm('modelo',null,{periodicidade:'mensal',dia:20,ajuste:'proximo',calculo:'fixo',ativo:true,ordem:S.modelos.length+1});
+    case'novaFixa':return openForm('fixa',null,{periodicidade:'mensal',dia:10,ajuste:'proximo',categoria:'Aluguel e coworking',ativo:true});
+    case'editFixa':return openForm('fixa',M);
+    case'gerarFixas':{const novos=fixasDoMes(S.ref.y,S.ref.m).filter(x=>!S.lanc.some(l=>l.id===x.id));for(const x of novos){const d={...x};delete d.id;await put('lancamentos',x.id,d)}return toast(`${novos.length} conta${novos.length===1?' fixa criada':'s fixas criadas'} como saída a pagar`)}
     case'editModelo':return openForm('modelo',M);
     case'config':return openForm('config',S.config);
     case'pagarOb':{const o={...O,status:'pago',pagoEm:hoje()};delete o.id;await put('obrigacoes',id,o);await syncOb({...o,id});return toast(`${O.nome} marcado como pago`)}
@@ -863,7 +902,7 @@ async function act(a,id,btn){
     if(a==='delLanc')await del('lancamentos',id);
     if(a==='delNota'){await del('notas',id);if(S.lanc.some(l=>l.id==='nf-'+id))await del('lancamentos','nf-'+id)}
     if(a==='delOb'){await del('obrigacoes',id);if(S.lanc.some(l=>l.id==='ob-'+id))await del('lancamentos','ob-'+id)}
-    if(a==='delModelo')await del('modelos',id);
+    if(a==='delModelo'||a==='delFixa')await del('modelos',id);
     toast('Excluído');
   }
   }catch(x){toast(msgErr(x))}
