@@ -365,6 +365,21 @@ function render(){
 /* 13º e férias: média do que a PJ recebeu no ano */
 function benefMeses(y){return(S.benef[String(y)]||{}).meses||{}}
 /* ---------- CLT (pessoa física): separada da PJ ---------- */
+// Tabelas de 2026. INSS: Portaria Interministerial MPS/MF 13/2026. IR: Receita Federal + redução da Lei 15.270/2025.
+const INSS_FAIXAS=[[1621.00,0.075],[2902.84,0.09],[4354.27,0.12],[8475.55,0.14]];
+const IR_FAIXAS=[[2428.80,0,0],[2826.65,0.075,182.16],[3751.05,0.15,394.16],[4664.68,0.225,675.49],[Infinity,0.275,908.73]];
+const IR_DEPENDENTE=189.59,IR_SIMPLIFICADO=607.20;
+const r2=v=>Math.round((v+Number.EPSILON)*100)/100;
+function inss(v){let t=0,ant=0;for(const[lim,al]of INSS_FAIXAS){if(v<=ant)break;t+=(Math.min(v,lim)-ant)*al;ant=lim}return r2(t)}
+// simplificado: a fonte pagadora usa o maior entre (INSS + dependentes) e o desconto simplificado; no 13º só valem INSS e dependentes
+function irrf(bruto,inssV,deps,simplificado){
+  const legais=inssV+deps*IR_DEPENDENTE,ded=simplificado?Math.max(legais,IR_SIMPLIFICADO):legais;
+  const base=Math.max(0,bruto-ded),f=IR_FAIXAS.find(([lim])=>base<=lim);
+  const imp=Math.max(0,base*f[1]-f[2]);
+  const red=bruto<=5000?Math.min(312.89,imp):bruto<=7350?Math.max(0,978.62-0.133145*bruto):0;
+  return r2(Math.max(0,imp-red));
+}
+function liquido(bruto,deps,simplificado){const i=inss(bruto),ir=irrf(bruto,i,deps,simplificado);return{bruto:r2(bruto),inss:i,ir,liq:r2(bruto-i-ir)}}
 // 13º = soma dos salários do ano ÷ meses com salário; férias = 13º + 1/3
 function cltCalc(y){
   const adm=S.config.cltAdmissao;if(!adm)return null;
@@ -373,7 +388,9 @@ function cltCalc(y){
   const vals=MESES.map((_,i)=>i+1>=ini?(S.clt[ym(y,i+1)]||0):0);
   const n=vals.filter(v=>v>0).length,soma=vals.reduce((a,b)=>a+b,0);
   const dec=n?soma/n:0,terco=dec/3,fer=dec+terco;
-  return{adm,ini,vals,n,soma,dec,terco,fer,total:dec+fer};
+  const deps=+S.config.cltDependentes||0;
+  const l13=liquido(dec,deps,false),lFer=liquido(fer,deps,true);
+  return{adm,ini,vals,n,soma,dec,terco,fer,total:dec+fer,deps,l13,lFer,parc1:r2(dec/2),parc2:r2(l13.liq-dec/2)};
 }
 function vClt(){
   const dis=S.canWrite?'':'disabled';
@@ -384,12 +401,12 @@ function vClt(){
     if(i+1<c.ini)return `<tr class="zero"><td style="text-transform:capitalize">${m}</td><td class="num"><span class="muted">antes da admissão</span></td></tr>`;
     return `<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td><td class="num"><input id="clt-${k}" data-clt="${k}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Salário bruto de ${m}" ${dis}></td></tr>`}).join('');
   return `
-  <div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Área da <b>pessoa física</b>: nada daqui entra nas entradas, saídas ou no 13º da PJ. Admissão em ${fmtD(c.adm)}.</span><button class="btn ghost sm" data-act="cltDados" ${dis}>Alterar admissão</button></div>
+  <div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Área da <b>pessoa física</b>: nada daqui entra nas entradas, saídas ou no 13º da PJ. Admissão em ${fmtD(c.adm)}.</span><button class="btn ghost sm" data-act="cltDados" ${dis}>Admissão e dependentes</button></div>
   <section class="kpis">
     <div class="kpi"><div class="lbl">Salários de ${y}</div><div class="val">${brl(c.soma)}</div><div class="sub">soma dos meses lançados</div></div>
     <div class="kpi"><div class="lbl">Meses lançados</div><div class="val">${c.n}</div><div class="sub">de ${possiveis}${c.ini>1&&c.ini<=12?` (${MESES[c.ini-1].slice(0,3)} a dez)`:''}</div></div>
-    <div class="kpi hl"><div class="lbl">13º salário</div><div class="val">${brl(c.dec)}</div><div class="sub">soma ÷ meses</div></div>
-    <div class="kpi"><div class="lbl">Férias + 1/3</div><div class="val pos">${brl(c.fer)}</div><div class="sub">13º + ${brl(c.terco)}</div></div>
+    <div class="kpi hl"><div class="lbl">13º líquido</div><div class="val">${brl(c.l13.liq)}</div><div class="sub">bruto ${brl(c.dec)}</div></div>
+    <div class="kpi"><div class="lbl">Férias + 1/3 líquido</div><div class="val pos">${brl(c.lFer.liq)}</div><div class="sub">bruto ${brl(c.fer)}</div></div>
   </section>
   <section class="grid2">
   <div class="panel">
@@ -406,9 +423,30 @@ function vClt(){
       <div><span><b>13º salário</b><span class="op">soma ÷ meses</span></span><span class="big">${brl(c.dec)}</span></div>
       <div><span>+ 1/3 de férias<span class="op">13º ÷ 3</span></span><b>${brl(c.terco)}</b></div>
       <div><span><b>Férias</b><span class="op">13º + 1/3</span></span><span class="big pos">${brl(c.fer)}</span></div>
-      <div><span><b>Total</b><span class="op">13º + férias</span></span><span class="big">${brl(c.total)}</span></div>
+      <div><span><b>Total bruto</b><span class="op">13º + férias</span></span><span class="big">${brl(c.total)}</span></div>
     </div>
-    <p class="note" style="margin:12px 0 0">Valores brutos. No pagamento, a empresa desconta INSS e IR.</p>
+  </div></section>
+  <section class="grid2">
+  <div class="panel">
+    <div class="ph"><h2>13º: do bruto ao líquido</h2><span class="hint">tributação separada do salário</span></div>
+    <div class="calc">
+      <div><span>13º bruto</span><b>${brl(c.l13.bruto)}</b></div>
+      <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(c.l13.inss)}</b></div>
+      <div><span>− Imposto de Renda<span class="op">${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(c.l13.ir)}</b></div>
+      <div><span><b>13º líquido</b></span><span class="big">${brl(c.l13.liq)}</span></div>
+      <div><span>1ª parcela, até 30/11<span class="op">metade do bruto, sem desconto</span></span><b>${brl(c.parc1)}</b></div>
+      <div><span>2ª parcela, até 20/12<span class="op">líquido − 1ª parcela</span></span><b>${brl(c.parc2)}</b></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><h2>Férias: do bruto ao líquido</h2><span class="hint">férias + 1/3</span></div>
+    <div class="calc">
+      <div><span>Férias + 1/3 bruto</span><b>${brl(c.lFer.bruto)}</b></div>
+      <div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(c.lFer.inss)}</b></div>
+      <div><span>− Imposto de Renda<span class="op">${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026</span></span><b class="neg">${brl(c.lFer.ir)}</b></div>
+      <div><span><b>Férias líquido</b></span><span class="big pos">${brl(c.lFer.liq)}</span></div>
+    </div>
+    <p class="note" style="margin:12px 0 0">Estimativa com as tabelas de 2026. O holerite da empresa é o valor oficial: o INSS das férias pode sair diferente, porque a empresa soma as férias ao salário do mês. ${c.deps?'':'Se você tem dependentes no IR, informe em “Alterar admissão”.'}</p>
   </div></section>`;
 }
 
@@ -758,8 +796,9 @@ const F={
   config:{t:'cálculo do DAS',f:[
     {k:'aliquota',l:'Alíquota efetiva (%)',type:'money',req:1,help:'Veja no último PGDAS-D'},
     {k:'anexo',l:'Enquadramento',type:'text',ph:'Ex.: Simples Nacional – Anexo III'}]},
-  cltDados:{t:'data de admissão da CLT',f:[
-    {k:'cltAdmissao',l:'Data de admissão',type:'date',req:1,full:1,help:'Meses antes da admissão não entram no 13º e nas férias.'}]},
+  cltDados:{t:'dados da CLT',f:[
+    {k:'cltAdmissao',l:'Data de admissão',type:'date',req:1,help:'Meses antes da admissão não entram no 13º e nas férias.'},
+    {k:'cltDependentes',l:'Dependentes no IR',type:'number',help:'Filhos ou outros dependentes declarados à empresa. 0 se nenhum.'}]},
   inicio:{t:'início da PJ',f:[
     {k:'inicioPj',l:'Mês em que a PJ começou',type:'month',req:1,full:1,help:'Meses anteriores não entram no 13º e nas férias. Nos anos seguintes a conta começa em janeiro.'}]}
 };

@@ -43,6 +43,7 @@ Separada de tudo da PJ. Usa o salário **bruto** lançado mês a mês, a partir 
 
 - **13º** = soma dos salários do ano ÷ número de meses com salário.
 - **Férias** = 13º + 1/3 do 13º.
+- **Líquido estimado**: desconta INSS (tabela de 2026, 7,5% a 14%, teto R$ 8.475,55) e IR (tabela da Receita de 2026 com a redução da Lei 15.270/2025; R$ 189,59 por dependente). No 13º o IR é separado e só deduz INSS e dependentes; nas férias vale o desconto simplificado de R$ 607,20 quando for maior.
 
 ## Como atualizar
 
