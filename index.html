@@ -92,8 +92,8 @@ main{padding-block:24px 64px;display:grid;gap:24px}
 .kpi .lbl{font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
 .kpi .val{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi .sub{font-size:13px;color:var(--ink-3);margin-top:2px}
-.kpi.hl{background:var(--ink);border-color:var(--ink);color:var(--bg)}
-.kpi.hl .lbl,.kpi.hl .sub{color:color-mix(in srgb,var(--bg) 72%,transparent)}
+.kpi.hl{background:var(--hl-bg,var(--ink));border-color:var(--hl-bg,var(--ink));color:var(--hl-fg,var(--bg))}
+.kpi.hl .lbl,.kpi.hl .sub{color:var(--hl-fg,var(--bg));opacity:.75}
 .pos{color:var(--teal-ink)} .neg{color:var(--bad)}
 .kpi.hl .pos,.kpi.hl .neg{color:inherit}
 
@@ -106,7 +106,7 @@ h2{font-size:17px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balan
 
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
 .btn:hover{border-color:var(--ink-3)}
-.btn.primary{background:var(--pink);border-color:var(--pink);color:#fff}
+.btn.primary{background:var(--pink,#E8628F);border-color:var(--pink,#E8628F);color:var(--on-pink,#fff)}
 .btn.primary:hover{filter:brightness(.95)}
 .btn.teal{background:var(--teal);border-color:var(--teal);color:#fff}
 .btn.sm{padding:5px 10px;font-size:13px}
@@ -392,6 +392,10 @@ function rbt12(){let t=0;for(let i=1;i<=12;i++){const p=addM(S.ref.y,S.ref.m,-i)
 /* ---------- marca de cada conta ---------- */
 const KEY_SVG='<svg viewBox="0 0 340 330" aria-hidden="true"><rect x="0" y="0" width="56" height="320" fill="currentColor"/><path d="M56 132 L228 22 L262 72 L120 166 Z" fill="currentColor"/><path d="M56 186 L120 166 L250 252 L232 302 Z" fill="currentColor"/><circle cx="288" cy="48" r="48" fill="#E8628F"/><rect x="240" y="224" width="96" height="96" rx="10" fill="#1F6E78"/></svg>';
 const COR=/^#[0-9a-f]{6}$/i;
+const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const misturar=(a,b,t)=>{const x=rgb(a),y=rgb(b);return'#'+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,'0')).join('')};
+// luminância relativa (0 = preto, 1 = branco)
+const luz=h=>{const[r,g,b]=rgb(h).map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*r+.7152*g+.0722*b};
 // fora do login vale a última marca usada neste navegador
 function marcaAtual(){
   if(S.db)return{nome:S.config.empresaNome||'',cnpj:S.config.cnpj||'',logo:S.config.logo||'',c1:S.config.corPrincipal||'',c2:S.config.corDestaque||''};
@@ -406,9 +410,18 @@ function aplicarMarca(){
   for(const id of['marca']){const el=document.getElementById(id);if(el&&el.dataset.h!==html){el.innerHTML=html;el.dataset.h=html}}
   document.title=S.db&&nome?`${nome} · AIME Financy`:'AIME Financy';
   const st=document.documentElement.style;
-  if(!key&&COR.test(m.c2||'')){st.setProperty('--pink',m.c2);st.setProperty('--pink-ink',`color-mix(in srgb,${m.c2} 78%,var(--ink))`);st.setProperty('--pink-soft',`color-mix(in srgb,${m.c2} 16%,var(--surface))`);st.setProperty('--hero-accent',`color-mix(in srgb,${m.c2} 70%,#fff)`)}
-  else ['--pink','--pink-ink','--pink-soft','--hero-accent'].forEach(p=>st.removeProperty(p));
-  if(!key&&COR.test(m.c1||''))st.setProperty('--hero-bg',m.c1);else st.removeProperty('--hero-bg');
+  // cores calculadas aqui (sem color-mix), para funcionar em qualquer navegador
+  const vars=['--pink','--pink-ink','--pink-soft','--hero-accent','--on-pink','--hero-bg','--hero-fg','--teal','--teal-ink','--teal-soft','--hl-bg','--hl-fg'];
+  vars.forEach(p=>st.removeProperty(p));
+  if(!key&&COR.test(m.c2||'')){const c=m.c2,[r,g,b]=rgb(c);
+    st.setProperty('--pink',c);st.setProperty('--pink-ink',luz(c)>.45?misturar(c,'#000000',.45):c);
+    st.setProperty('--pink-soft',`rgba(${r},${g},${b},.14)`);st.setProperty('--hero-accent',misturar(c,'#ffffff',.72));
+    st.setProperty('--on-pink',luz(c)>.6?'#1E1A1D':'#ffffff')}
+  // cor principal: resumos, destaque escuro e botões de "pago" (no lugar do ameixa e do verde da Key)
+  if(!key&&COR.test(m.c1||'')){const c=m.c1,[r,g,b]=rgb(c),clara=luz(c)>.45;
+    st.setProperty('--hero-bg',clara?misturar(c,'#000000',.55):c);st.setProperty('--hero-fg','#ffffff');st.setProperty('--hl-bg',clara?misturar(c,'#000000',.55):c);st.setProperty('--hl-fg','#ffffff');
+    st.setProperty('--teal',clara?misturar(c,'#000000',.35):c);st.setProperty('--teal-ink',clara?misturar(c,'#000000',.45):c);
+    st.setProperty('--teal-soft',`rgba(${r},${g},${b},.13)`)}
   const b=document.getElementById('btnMarca');if(b)b.hidden=!S.db;
   if(S.db&&S.carregou){try{const c={...m};if((c.logo||'').length>200000)c.logo='';localStorage.setItem('km-marca',JSON.stringify(c))}catch(e){}}
 }
@@ -797,7 +810,7 @@ function previsaoPagamentos(y){
 }
 function vResumoAno(){
   const y=S.ref.y,r=resumoAno(y);
-  if(!r.temPj&&!r.temClt)return `<div class="panel"><div class="ph"><h2>Seu fim de ano ${y}</h2></div><p class="note" style="margin:0">Lance os recebimentos da PJ em “13º e férias PJ” e os salários em “CLT (pessoa física)” para ver aqui quanto você vai receber de 13º e de férias.</p></div>`;
+  if(!r.temPj&&!r.temClt)return `<div class="panel"><div class="ph"><h2>Seu fim de ano ${y}</h2></div><p class="note" style="margin:0">Lance os recebimentos da PJ em “13º e férias PJ” e os salários em “Funcionários” para ver aqui quanto você vai receber de 13º e de férias.</p></div>`;
   const linha=(rot,v,sub)=>`<div class="rl"><span>${rot}${sub?`<small>${sub}</small>`:''}</span><b>${brl(v)}</b></div>`;
   const partes=(pj,clt)=>[r.temPj?`${brl(pj)} da PJ`:'',r.temClt?`${brl(clt)} líquidos da CLT`:''].filter(Boolean).join(' + ');
   const pg=previsaoPagamentos(y);
