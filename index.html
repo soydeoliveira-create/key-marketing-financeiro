@@ -69,6 +69,30 @@ header.top{padding-block:22px 0}
 .brand .ini{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--hero-bg);color:var(--hero-fg);font-weight:800;font-size:18px;flex:none}
 .brand .cnpj{display:block;font-size:12px;color:var(--ink-3);margin-top:3px}
 .brand b.nome{text-transform:none}
+/* topo futurista das empresas com marca própria: faixa escura na cor principal, grade fina e brilho */
+body.futuro header.top{position:relative;overflow:hidden;color:#fff;padding-block:24px 0;
+  background:
+    radial-gradient(60% 140% at 88% -20%,var(--top-glow,rgba(255,255,255,.18)),transparent 60%),
+    radial-gradient(40% 120% at 8% 120%,var(--top-glow2,rgba(255,255,255,.10)),transparent 65%),
+    linear-gradient(115deg,var(--top-1,#0B1A33) 0%,var(--top-2,#13294F) 100%)}
+body.futuro header.top::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.55;
+  background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);background-size:28px 28px;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 35%,#000 70%,transparent);mask-image:linear-gradient(90deg,transparent,#000 35%,#000 70%,transparent)}
+body.futuro header.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,var(--top-line,#fff) 30%,var(--top-line,#fff) 70%,transparent);opacity:.8}
+body.futuro header.top .wrap{position:relative}
+body.futuro .brand img,body.futuro .brand .ini{background:#fff;border-radius:12px;padding:6px 10px;height:56px;max-width:170px;box-shadow:0 0 0 1px rgba(255,255,255,.35),0 8px 30px -8px var(--top-glow,rgba(0,0,0,.5))}
+body.futuro .brand .ini{width:56px;padding:0;color:var(--top-2,#13294F)}
+body.futuro .brand b{color:#fff;letter-spacing:-.01em;text-shadow:0 0 24px rgba(255,255,255,.18)}
+body.futuro .brand .spaced{color:var(--top-line,#fff)}
+body.futuro .brand .cnpj{color:rgba(255,255,255,.62);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+body.futuro .month,body.futuro .sair{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.22);color:#fff;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+body.futuro .month button{color:rgba(255,255,255,.8)}
+body.futuro .month button:hover,body.futuro .sair:hover{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.4)}
+body.futuro nav.tabs{border-bottom-color:transparent;margin-top:26px}
+body.futuro nav.tabs button{color:rgba(255,255,255,.66)}
+body.futuro nav.tabs button:hover{color:#fff}
+body.futuro nav.tabs button[aria-selected="true"]{color:#fff;border-bottom-color:var(--top-line,#fff);text-shadow:0 0 16px rgba(255,255,255,.35)}
+body.futuro main{padding-top:28px}
 footer.sist{padding-block:0 28px;margin-top:-40px;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-3);text-align:center}
 .login .sist{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-3);text-align:center;margin:0}
 .month{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px}
@@ -411,7 +435,7 @@ function aplicarMarca(){
   document.title=S.db&&nome?`${nome} · AIME Financy`:'AIME Financy';
   const st=document.documentElement.style;
   // cores calculadas aqui (sem color-mix), para funcionar em qualquer navegador
-  const vars=['--pink','--pink-ink','--pink-soft','--hero-accent','--on-pink','--hero-bg','--hero-fg','--teal','--teal-ink','--teal-soft','--hl-bg','--hl-fg'];
+  const vars=['--pink','--pink-ink','--pink-soft','--hero-accent','--on-pink','--hero-bg','--hero-fg','--teal','--teal-ink','--teal-soft','--hl-bg','--hl-fg','--top-1','--top-2','--top-glow','--top-glow2','--top-line'];
   vars.forEach(p=>st.removeProperty(p));
   if(!key&&COR.test(m.c2||'')){const c=m.c2,[r,g,b]=rgb(c);
     st.setProperty('--pink',c);st.setProperty('--pink-ink',luz(c)>.45?misturar(c,'#000000',.45):c);
@@ -421,7 +445,10 @@ function aplicarMarca(){
   if(!key&&COR.test(m.c1||'')){const c=m.c1,[r,g,b]=rgb(c),clara=luz(c)>.45;
     st.setProperty('--hero-bg',clara?misturar(c,'#000000',.55):c);st.setProperty('--hero-fg','#ffffff');st.setProperty('--hl-bg',clara?misturar(c,'#000000',.55):c);st.setProperty('--hl-fg','#ffffff');
     st.setProperty('--teal',clara?misturar(c,'#000000',.35):c);st.setProperty('--teal-ink',clara?misturar(c,'#000000',.45):c);
-    st.setProperty('--teal-soft',`rgba(${r},${g},${b},.13)`)}
+    st.setProperty('--teal-soft',`rgba(${r},${g},${b},.13)`);
+    st.setProperty('--top-1',misturar(c,'#000000',.72));st.setProperty('--top-2',misturar(c,'#000000',clara?.5:.18));st.setProperty('--top-glow2',`rgba(${r},${g},${b},.55)`)}
+  if(!key&&COR.test(m.c2||'')){const[r,g,b]=rgb(m.c2);st.setProperty('--top-glow',`rgba(${r},${g},${b},.6)`);st.setProperty('--top-line',misturar(m.c2,'#ffffff',.55))}
+  document.body.classList.toggle('futuro',!key&&!!S.db);
   const b=document.getElementById('btnMarca');if(b)b.hidden=!S.db;
   if(S.db&&S.carregou){try{const c={...m};if((c.logo||'').length>200000)c.logo='';localStorage.setItem('km-marca',JSON.stringify(c))}catch(e){}}
 }
