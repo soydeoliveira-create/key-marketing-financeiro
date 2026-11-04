@@ -27,7 +27,7 @@ select id, email from auth.users where email = 'email-da-pessoa@exemplo.com';
 
 ## Tabelas
 
-`lancamentos`, `notas`, `obrigacoes`, `modelos` (obrigações recorrentes), `beneficios` (valores do 13º por ano), `config` (alíquota do DAS) e `membros`.
+`lancamentos`, `notas`, `obrigacoes`, `modelos` (obrigações recorrentes), `beneficios` (valores do 13º da PJ por ano), `clt_salarios` (salário bruto CLT por mês, pessoa física), `config` (alíquota do DAS, início da PJ, dados da CLT) e `membros`.
 
 ## Regras de cálculo
 
@@ -35,6 +35,15 @@ select id, email from auth.users where email = 'email-da-pessoa@exemplo.com';
 - **Vencimento em fim de semana ou feriado:** o DAS passa para o próximo dia útil; INSS e FGTS são antecipados.
 - **13º** = soma dos meses lançados ÷ número de meses com valor.
 - **Férias** = 13º + 1/3 do 13º.
+- Na PJ, só o recebimento do dia 5 entra no 13º e nas férias, e 2026 conta a partir de abril (início da PJ).
+
+### CLT (pessoa física)
+
+Separada de tudo da PJ. Usa o salário **bruto** e a regra da CLT:
+
+- **13º** = base × meses do ano com 15 dias ou mais trabalhados ÷ 12.
+- **Férias** = base × meses do período aquisitivo ÷ 12, + 1/3. Sobra de 15 dias ou mais conta como mês.
+- **Base** = último salário (salário fixo) ou média dos salários (salário que varia), escolhida em "Dados da CLT".
 
 ## Como atualizar
 

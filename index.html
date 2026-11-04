@@ -252,7 +252,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
       <button role="tab" data-v="notas">Notas fiscais</button>
       <button role="tab" data-v="impostos">Impostos e obrigações</button>
       <button role="tab" data-v="cal">Calendário</button>
-      <button role="tab" data-v="beneficios">13º e férias</button>
+      <button role="tab" data-v="beneficios">13º e férias PJ</button>
+      <button role="tab" data-v="clt">CLT (pessoa física)</button>
     </nav>
   </div>
 </header>
@@ -317,9 +318,9 @@ const CAT_IN=['Serviços prestados','Gestão de redes sociais','Tráfego pago (g
 const CAT_OUT=['Impostos e taxas','Pró-labore','Mídia paga (anúncios)','Ferramentas e softwares','Freelancers e fornecedores','Contabilidade','Aluguel e coworking','Internet e telefone','Tarifas bancárias','Equipamentos','Outras saídas'];
 
 const now=new Date();
-const S={lanc:[],notas:[],obrig:[],modelos:[],benef:{},config:{aliquota:6},ref:{y:now.getFullYear(),m:now.getMonth()+1},view:'geral',dia:null,lancTipo:'todos',db:null,canWrite:true,loaded:0,offline:false};
+const S={lanc:[],notas:[],obrig:[],modelos:[],benef:{},clt:{},config:{aliquota:6},ref:{y:now.getFullYear(),m:now.getMonth()+1},view:'geral',dia:null,lancTipo:'todos',db:null,canWrite:true,loaded:0,offline:false};
 try{const v=localStorage.getItem('km-view');if(v)S.view=v}catch(e){}
-const h=location.hash.replace('#','');if(['geral','lanc','notas','impostos','cal','beneficios'].includes(h))S.view=h;
+const h=location.hash.replace('#','');if(['geral','lanc','notas','impostos','cal','beneficios','clt'].includes(h))S.view=h;
 
 const app=document.getElementById('app');
 const refYM=()=>ym(S.ref.y,S.ref.m);
@@ -354,7 +355,7 @@ function render(){
   if(!S.db&&S.loaded<0)html+=`<div class="banner">Não foi possível carregar a conexão com o banco de dados. Confira a internet e recarregue a página.</div>`;
   if(S.semAcesso)html+=`<div class="banner">A conta ${esc(S.email||'')} entrou, mas ainda não tem acesso aos dados da empresa. Peça para liberar este e-mail no Supabase.</div>`;
   if(!S.canWrite&&!S.semAcesso)html+=`<div class="banner">Você está vendo o painel em modo leitura.</div>`;
-  html+=({geral:vGeral,lanc:vLanc,notas:vNotas,impostos:vImpostos,cal:vCal,beneficios:vBeneficios}[S.view]||vGeral)();
+  html+=({geral:vGeral,lanc:vLanc,notas:vNotas,impostos:vImpostos,cal:vCal,beneficios:vBeneficios,clt:vClt}[S.view]||vGeral)();
   // mantém o campo em que a pessoa está digitando quando chegam dados novos
   const ae=document.activeElement,fid=ae&&app.contains(ae)&&ae.id,fval=fid&&ae.value;
   app.innerHTML=html;
@@ -363,6 +364,88 @@ function render(){
 
 /* 13º e férias: média do que a PJ recebeu no ano */
 function benefMeses(y){return(S.benef[String(y)]||{}).meses||{}}
+/* ---------- CLT (pessoa física): regra da lei, separada da PJ ---------- */
+const maisUmDia=s=>{const d=toD(s);d.setDate(d.getDate()+1);return fromD(d)};
+// 13º: meses do calendário em que trabalhou 15 dias ou mais
+function avos13(de,ate){
+  if(!de||!ate||ate<de)return 0;
+  const d=toD(de),a=toD(ate);let n=0,y=d.getFullYear(),m=d.getMonth()+1;
+  while(y<a.getFullYear()||(y===a.getFullYear()&&m<=a.getMonth()+1)){
+    const ini=(y===d.getFullYear()&&m===d.getMonth()+1)?d.getDate():1;
+    const fim=(y===a.getFullYear()&&m===a.getMonth()+1)?a.getDate():daysIn(y,m);
+    if(fim-ini+1>=15)n++;
+    if(++m>12){m=1;y++}
+  }
+  return n;
+}
+// férias: meses contados a partir do início do período; sobra de 15 dias ou mais vale 1/12
+function somaMes(s,n){const[y,m,d]=s.split('-').map(Number);const t=addM(y,m,n);return iso(t.y,t.m,Math.min(d,daysIn(t.y,t.m)))}
+function avosFerias(de,ate){
+  if(!de||!ate||ate<de)return 0;
+  const lim=maisUmDia(ate);let k=0;
+  while(somaMes(de,k+1)<=lim)k++;
+  const resto=diff(ate,somaMes(de,k))+1;
+  return k+(resto>=15?1:0);
+}
+function cltCalc(){
+  const c=S.config,adm=c.cltAdmissao;if(!adm)return null;
+  const y=S.ref.y,fimAno=iso(y,12,31),corte=iso(y,S.ref.m,daysIn(y,S.ref.m));
+  const ateRef=Object.entries(S.clt).filter(([k,v])=>v>0&&k<=refYM()).sort((a,b)=>a[0].localeCompare(b[0]));
+  const ultimo=ateRef.length?ateRef[ateRef.length-1][1]:0;
+  const media=arr=>arr.length?arr.reduce((a,[,v])=>a+v,0)/arr.length:0;
+  const usaMedia=c.cltBase==='media';
+  const ini13=adm>iso(y,1,1)?adm:iso(y,1,1);
+  const av13=avos13(ini13,corte),av13Prev=avos13(ini13,fimAno);
+  const base13=usaMedia?media(ateRef.filter(([k])=>k.startsWith(y+'-'))):ultimo;
+  const per=c.cltPeriodoInicio||adm;
+  const avF=avosFerias(per,corte),completos=Math.floor(avF/12),avProp=avF%12;
+  const baseF=usaMedia?media(ateRef.filter(([k])=>k>=per.slice(0,7))):ultimo;
+  const fer=baseF*avProp/12;
+  return{adm,per,corte,usaMedia,base13,av13,av13Prev,dec:base13*av13/12,decPrev:base13*av13Prev/12,baseF,completos,avProp,fer,terco:fer/3,ferTot:fer*4/3,vencidas:baseF*completos*4/3};
+}
+function vClt(){
+  const dis=S.canWrite?'':'disabled';
+  const c=cltCalc();
+  if(!c)return `<div class="panel"><div class="empty"><b>CLT (pessoa física)</b>Aqui você lança seus salários CLT, separados da PJ. Para calcular 13º e férias pela regra da CLT, informe primeiro a data de admissão.<div style="margin-top:14px"><button class="btn primary" data-act="cltDados" ${dis}>Informar data de admissão</button></div></div></div>`;
+  const y=S.ref.y,mesRef=MESES[S.ref.m-1];
+  const admY=+c.adm.slice(0,4),admM=+c.adm.slice(5,7);
+  const rows=MESES.map((m,i)=>{const k=ym(y,i+1),v=S.clt[k]||0;
+    if(y<admY||(y===admY&&i+1<admM))return `<tr class="zero"><td style="text-transform:capitalize">${m}</td><td class="num"><span class="muted">antes da admissão</span></td></tr>`;
+    return `<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td><td class="num"><input id="clt-${k}" data-clt="${k}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Salário bruto de ${m}" ${dis}></td></tr>`}).join('');
+  const doAno=MESES.map((_,i)=>S.clt[ym(y,i+1)]||0),tot=doAno.reduce((a,b)=>a+b,0),nM=doAno.filter(v=>v>0).length;
+  const baseTxt=c.usaMedia?'média dos salários':'último salário';
+  return `
+  <div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Área da <b>pessoa física</b>: nada daqui entra nas entradas, saídas ou no 13º da PJ. Admissão em ${fmtD(c.adm)}.</span><button class="btn ghost sm" data-act="cltDados" ${dis}>Dados da CLT</button></div>
+  <section class="kpis">
+    <div class="kpi"><div class="lbl">Base do cálculo</div><div class="val">${brl(c.base13)}</div><div class="sub">${baseTxt}, bruto</div></div>
+    <div class="kpi"><div class="lbl">13º até ${mesRef}</div><div class="val">${brl(c.dec)}</div><div class="sub">${c.av13}/12 avos de ${y}</div></div>
+    <div class="kpi hl"><div class="lbl">13º previsto ${y}</div><div class="val">${brl(c.decPrev)}</div><div class="sub">${c.av13Prev}/12 avos até dezembro</div></div>
+    <div class="kpi"><div class="lbl">Férias + 1/3</div><div class="val pos">${brl(c.ferTot)}</div><div class="sub">${c.avProp}/12 avos acumulados</div></div>
+  </section>
+  ${c.completos?`<div class="banner">Você tem ${c.completos} período${c.completos>1?'s':''} completo${c.completos>1?'s':''} de férias (30 dias) para tirar, no valor de ${brl(c.vencidas)} com o 1/3. Depois de tirar, atualize o início do período em “Dados da CLT”.</div>`:''}
+  ${!c.base13?`<div class="banner">Lance o salário bruto de pelo menos um mês para o cálculo aparecer.</div>`:''}
+  <section class="grid2">
+  <div class="panel">
+    <div class="ph"><h2>Salários CLT de ${y}</h2><span class="hint">valor bruto do holerite</span></div>
+    <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Salário bruto</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td>Total (${nM} ${nM===1?'mês':'meses'})</td><td class="num">${brl(tot)}</td></tr></tfoot></table></div>
+    <p class="note" style="margin:12px 0 0">Lance o <b>total de vencimentos</b> do holerite, antes dos descontos de INSS e IR. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de mês e de ano.</p>
+  </div>
+  <div class="panel">
+    <div class="ph"><h2>Como o cálculo é feito</h2><span class="hint">regra da CLT, até ${fmtD(c.corte)}</span></div>
+    <div class="calc">
+      <div><span>Base<span class="op">${baseTxt}${c.usaMedia?` de ${y}`:''}</span></span><b>${brl(c.base13)}</b></div>
+      <div><span>Meses de ${y} com 15 dias ou mais<span class="op">até ${mesRef} · até dezembro</span></span><b>${c.av13} · ${c.av13Prev}</b></div>
+      <div><span><b>13º acumulado</b><span class="op">base × ${c.av13} ÷ 12</span></span><span class="big">${brl(c.dec)}</span></div>
+      <div><span><b>13º previsto</b><span class="op">base × ${c.av13Prev} ÷ 12 · 1ª parcela até 30/11, 2ª até 20/12</span></span><span class="big">${brl(c.decPrev)}</span></div>
+      <div><span>Férias proporcionais<span class="op">${c.usaMedia?'média do período':'base'} × ${c.avProp} ÷ 12 · período desde ${fmtD(c.per)}</span></span><b>${brl(c.fer)}</b></div>
+      <div><span>+ 1/3 de férias<span class="op">férias ÷ 3</span></span><b>${brl(c.terco)}</b></div>
+      <div><span><b>Férias com 1/3</b></span><span class="big pos">${brl(c.ferTot)}</span></div>
+    </div>
+    <p class="note" style="margin:12px 0 0">Valores brutos. No pagamento, a empresa desconta INSS e IR; a 1ª parcela do 13º vem sem desconto.</p>
+  </div></section>`;
+}
+
 const dia5=s=>!!s&&s.slice(8,10)==='05';
 // só o recebimento marcado (o do dia 5) entra na base do 13º e das férias
 function entradasMes(k){return S.lanc.filter(l=>l.tipo==='entrada'&&l.status!=='pendente'&&l.contaBeneficio===true&&inMonth(l.data,k)).reduce((a,l)=>a+(+l.valor||0),0)}
@@ -674,6 +757,10 @@ const F={
   config:{t:'cálculo do DAS',f:[
     {k:'aliquota',l:'Alíquota efetiva (%)',type:'money',req:1,help:'Veja no último PGDAS-D'},
     {k:'anexo',l:'Enquadramento',type:'text',ph:'Ex.: Simples Nacional – Anexo III'}]},
+  cltDados:{t:'dados da CLT',f:[
+    {k:'cltAdmissao',l:'Data de admissão',type:'date',req:1},
+    {k:'cltPeriodoInicio',l:'Início do período de férias atual',type:'date',help:'Em branco = data de admissão. Depois de tirar férias, coloque a data em que o novo período começou.'},
+    {k:'cltBase',l:'Base do cálculo',type:'select',full:1,opts:[['ultimo','Último salário (salário fixo)'],['media','Média dos salários (salário que varia)']]}]},
   inicio:{t:'início da PJ',f:[
     {k:'inicioPj',l:'Mês em que a PJ começou',type:'month',req:1,full:1,help:'Meses anteriores não entram no 13º e nas férias. Nos anos seguintes a conta começa em janeiro.'}]}
 };
@@ -732,6 +819,7 @@ const camel=k=>k.replace(/_([a-z])/g,(_,c)=>c.toUpperCase());
 function toRow(col,obj){const r={};for(const[k,v]of Object.entries(obj)){if(v===undefined)continue;if(col==='beneficios'&&k==='id')continue;r[snake(k)]=v===''?null:v}return r}
 function fromRow(row){const o={};for(const[k,v]of Object.entries(row))o[camel(k)]=v;return o}
 function guardar(col,row){
+  if(col==='clt_salarios'){S.clt[row.id]=+row.valor||0;return}
   if(col==='beneficios'){S.benef[String(row.ano)]={meses:row.meses||{}};return}
   if(col==='config'){S.config={aliquota:6,...fromRow(row)};return}
   const k=KEY[col],o=fromRow(row),i=S[k].findIndex(x=>x.id===o.id);
@@ -748,12 +836,16 @@ async function del(col,id){
   if(!S.db)throw{code:'no_db'};
   const{error}=await sb.from(col).delete().eq('id',id);
   if(error)throw error;
+  if(col==='clt_salarios')delete S.clt[id];
   const k=KEY[col];if(k)S[k]=S[k].filter(x=>x.id!==id);later();
 }
 const newId=()=>(crypto.randomUUID?crypto.randomUUID():'x'+Date.now()+Math.random().toString(36).slice(2));
 
 async function save(kind,rec,out){
-  if(kind==='config'||kind==='inicio'){await put('config','empresa',{aliquota:S.config.aliquota,anexo:S.config.anexo,inicioPj:S.config.inicioPj,...out});return}
+  if(kind==='config'||kind==='inicio'||kind==='cltDados'){
+    const{id:_i,atualizadoEm:_a,...atual}=S.config;
+    if(kind==='cltDados'&&!out.cltPeriodoInicio)out.cltPeriodoInicio=out.cltAdmissao;
+    await put('config','empresa',{...atual,...out});return}
   const spec=F[kind];const id=rec?.id||newId(spec.col);
   const base={...(rec||{})};delete base.id;
   const data={...base,...out,atualizadoEm:new Date().toISOString()};
@@ -797,6 +889,7 @@ async function act(a,id,btn){
     case'gerar':{const novos=modelosDoMes(S.ref.y,S.ref.m).filter(x=>!S.obrig.some(o=>o.id===x.id));for(const x of novos){const d={...x};delete d.id;await put('obrigacoes',x.id,d)}return toast(`${novos.length} obrigaç${novos.length===1?'ão criada':'ões criadas'}`)}
     case'csv':return exportCSV();
     case'inicio':return openForm('inicio',S.config);
+    case'cltDados':return openForm('cltDados',S.config);
     case'preencherBenef':{const y=S.ref.y,meses={...benefMeses(y)};let n=0;
       for(let i=mesInicial(y);i<=12;i++){const k=pad(i);if(+meses[k])continue;const e=entradasMes(ym(y,i));if(e>0){meses[k]=Math.round(e*100)/100;n++}}
       await put('beneficios',String(y),{ano:y,meses,atualizadoEm:new Date().toISOString()});return toast(`${n} ${n===1?'mês preenchido':'meses preenchidos'} com as entradas`)}
@@ -832,6 +925,10 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(b&&!b.disabled)act(b.dataset.act,b.dataset.id,b);
 });
 document.addEventListener('change',async e=>{
+  const ce=e.target.closest('[data-clt]');
+  if(ce){const id=ce.dataset.clt,v=Math.round(Number(ce.value)*100)/100;
+    try{if(v>0)await put('clt_salarios',id,{valor:v});else if(S.clt[id]!==undefined)await del('clt_salarios',id)}catch(x){toast(msgErr(x))}
+    return}
   const el=e.target.closest('[data-bm]');if(!el)return;
   const y=S.ref.y,meses={...benefMeses(y)},v=Number(el.value);
   if(v>0)meses[el.dataset.bm]=Math.round(v*100)/100;else delete meses[el.dataset.bm];
@@ -846,11 +943,12 @@ document.getElementById('mHoje').onclick=()=>{const d=new Date();S.ref={y:d.getF
 /* ---------- dados ---------- */
 let renderQ=0;const later=()=>{cancelAnimationFrame(renderQ);renderQ=requestAnimationFrame(render)};
 async function carregar(){
-  const tabelas=['lancamentos','notas','obrigacoes','modelos','beneficios','config'];
+  const tabelas=['lancamentos','notas','obrigacoes','modelos','beneficios','config','clt_salarios'];
   const res=await Promise.all(tabelas.map(t=>sb.from(t).select('*'))).catch(e=>[{error:e}]);
   const falha=res.find(r=>r.error);
   if(falha){console.error(falha.error);S.offline=true;render();return}
-  const[l,n,o,m,b,c]=res.map(r=>r.data);
+  const[l,n,o,m,b,c,cl]=res.map(r=>r.data);
+  S.clt=Object.fromEntries(cl.map(r=>[r.id,+r.valor||0]));
   S.lanc=l.map(fromRow);S.notas=n.map(fromRow);S.obrig=o.map(fromRow);S.modelos=m.map(fromRow);
   S.benef=Object.fromEntries(b.map(r=>[String(r.ano),{meses:r.meses||{}}]));
   const cf=c.find(r=>r.id==='empresa');if(cf)S.config={aliquota:6,...fromRow(cf)};
@@ -866,7 +964,7 @@ async function entrou(session){
   if(ok)await carregar();else render();
 }
 function pedirLogin(){
-  S.db=null;S.lanc=[];S.notas=[];S.obrig=[];S.modelos=[];S.benef={};S.semAcesso=false;
+  S.db=null;S.lanc=[];S.notas=[];S.obrig=[];S.modelos=[];S.benef={};S.clt={};S.semAcesso=false;
   document.getElementById('btnSair').hidden=true;
   document.getElementById('login').hidden=false;
   render();setTimeout(()=>document.getElementById('lgEmail').focus(),30);
