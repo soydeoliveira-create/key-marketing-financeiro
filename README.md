@@ -39,11 +39,10 @@ select id, email from auth.users where email = 'email-da-pessoa@exemplo.com';
 
 ### CLT (pessoa física)
 
-Separada de tudo da PJ. Usa o salário **bruto** e a regra da CLT:
+Separada de tudo da PJ. Usa o salário **bruto** lançado mês a mês, a partir da data de admissão:
 
-- **13º** = base × meses do ano com 15 dias ou mais trabalhados ÷ 12.
-- **Férias** = base × meses do período aquisitivo ÷ 12, + 1/3. Sobra de 15 dias ou mais conta como mês.
-- **Base** = último salário (salário fixo) ou média dos salários (salário que varia), escolhida em "Dados da CLT".
+- **13º** = soma dos salários do ano ÷ número de meses com salário.
+- **Férias** = 13º + 1/3 do 13º.
 
 ## Como atualizar
 
