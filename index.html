@@ -9,7 +9,7 @@
 <title>AIME Financy · Key Marketing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600;900&family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap">
 <style>
 /* Layout: faixa da marca no topo, abas por assunto, um mês de referência que vale para todas as telas. */
 :root{
@@ -59,7 +59,13 @@ header.top{padding-block:22px 0}
 .spaced{font-size:11px;letter-spacing:.42em;text-transform:uppercase;color:var(--pink-ink);font-weight:500}
 .brand .spaced{display:block;margin-top:6px}
 .brand img{height:44px;width:auto;max-width:140px;object-fit:contain;flex:none}
-.login .brand img{height:52px}
+.aimelogo{display:flex;align-items:center;gap:16px;justify-content:center;--aime-ink:#0C2D3D;--aime-fin:#4F6B94}
+.aimelogo svg{height:92px;width:auto;flex:none}
+.aimelogo b{display:block;font-family:Inter,var(--font);font-weight:900;font-size:44px;line-height:.9;letter-spacing:-.01em;color:var(--aime-ink)}
+.aimelogo .fin{display:block;font-family:Inter,var(--font);font-weight:300;font-size:33px;line-height:1.1;color:var(--aime-fin)}
+.aimelogo .rh{display:block;font-family:Inter,var(--font);font-weight:600;font-size:11px;letter-spacing:.38em;text-transform:uppercase;color:#8A8F99;margin-top:4px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .aimelogo{--aime-ink:#F2EEE6;--aime-fin:#E4D6C0}}
+:root[data-theme="dark"] .aimelogo{--aime-ink:#F2EEE6;--aime-fin:#E4D6C0}
 .brand .ini{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--hero-bg);color:var(--hero-fg);font-weight:800;font-size:18px;flex:none}
 .brand .cnpj{display:block;font-size:12px;color:var(--ink-3);margin-top:3px}
 .brand b.nome{text-transform:none}
@@ -230,6 +236,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
 .f.check input{width:18px;height:18px}
 .f .help{font-size:12px;color:var(--ink-3)}
 .mactions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+/* a tela de entrada é do AIME Financy, não da empresa */
+.login .btn.primary{background:#465F86;border-color:#465F86}
+.login form .troca{color:#4F6B94}
+.login .f input:focus{outline-color:#5C7AA3}
 .err{grid-column:1/-1;color:var(--bad);font-size:13px}
 
 /* login */
@@ -297,7 +307,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
 
 <div class="login" id="login" hidden>
   <div class="box">
-    <div class="brand" id="marcaLogin"></div>
+    <div class="aimelogo" role="img" aria-label="AIME Financy, RH financeiro">
+      <svg viewBox="0 30 460 415" aria-hidden="true"><defs><linearGradient id="fa-lilas" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B9C1DA"/><stop offset="1" stop-color="#97A3C8"/></linearGradient><linearGradient id="fa-champ" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E4D6C0"/><stop offset="1" stop-color="#CBB593"/></linearGradient><linearGradient id="fa-indigo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5C7AA3"/><stop offset="1" stop-color="#465F86"/></linearGradient></defs><path fill="url(#fa-lilas)" d="M127,45 H330 A125,125 0 0 1 455,170 V403 Q455,430 428,430 H362 Q335,430 335,403 V155 Q335,130 310,130 H127 Q100,130 100,103 V72 Q100,45 127,45 Z"/><path fill="url(#fa-champ)" d="M5,285 A110,110 0 0 1 115,175 H263 Q290,175 290,202 V238 Q290,265 263,265 H142 Q115,265 115,292 V393 Q115,420 88,420 H32 Q5,420 5,393 Z"/><path fill="url(#fa-indigo)" d="M166,355 H202 Q223,355 223,376 V409 Q223,430 202,430 H166 Q145,430 145,409 V376 Q145,355 166,355 Z"/><path fill="url(#fa-indigo)" d="M262,295 H298 Q319,295 319,316 V409 Q319,430 298,430 H262 Q241,430 241,409 V316 Q241,295 262,295 Z"/></svg>
+      <div><b>AIME</b><span class="fin">Financy</span><span class="rh">RH Financeiro</span></div>
+    </div>
     <form id="loginForm" novalidate>
       <h1 id="loginTitulo">Entrar no AIME Financy</h1>
       <p id="loginSub">Use o e-mail e a senha da sua conta.</p>
@@ -390,8 +403,8 @@ function aplicarMarca(){
   // o nome da empresa é o que cada conta cadastrar; AIME Financy é o nome do sistema
   const nome=m.nome||(key?'key marketing':'');
   const html=`${key?KEY_SVG:m.logo?`<img src="${esc(m.logo)}" alt="">`:`<span class="ini" aria-hidden="true">${esc(iniciais)}</span>`}<div><b class="nome">${esc(nome||'Sua empresa')}</b><span class="spaced">Financeiro</span>${m.cnpj&&!key?`<span class="cnpj">CNPJ ${esc(m.cnpj)}</span>`:''}</div>`;
-  for(const id of['marca','marcaLogin']){const el=document.getElementById(id);if(el&&el.dataset.h!==html){el.innerHTML=html;el.dataset.h=html}}
-  document.title=nome?`${nome} · AIME Financy`:'AIME Financy';
+  for(const id of['marca']){const el=document.getElementById(id);if(el&&el.dataset.h!==html){el.innerHTML=html;el.dataset.h=html}}
+  document.title=S.db&&nome?`${nome} · AIME Financy`:'AIME Financy';
   const st=document.documentElement.style;
   if(!key&&COR.test(m.c2||'')){st.setProperty('--pink',m.c2);st.setProperty('--pink-ink',`color-mix(in srgb,${m.c2} 78%,var(--ink))`);st.setProperty('--pink-soft',`color-mix(in srgb,${m.c2} 16%,var(--surface))`);st.setProperty('--hero-accent',`color-mix(in srgb,${m.c2} 70%,#fff)`)}
   else ['--pink','--pink-ink','--pink-soft','--hero-accent'].forEach(p=>st.removeProperty(p));
