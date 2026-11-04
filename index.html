@@ -493,7 +493,7 @@ function vClt(){
   const dis=S.canWrite?'':'disabled';
   if(!S.func.length)return `<div class="panel"><div class="empty"><b>Nenhum funcionário cadastrado</b>Cadastre cada funcionário da empresa com nome, regime e data de admissão. Depois, lance o salário de cada mês: o painel calcula o líquido, o 13º e as férias de cada um.<div style="margin-top:14px"><button class="btn primary" data-act="novoFunc" ${dis}>+ Funcionário</button></div></div></div>`;
   const y=S.ref.y,f=funcAtual(),c=cltCalc(y,f);
-  const cab=`<div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>${esc(f.nome)}</b>${f.cargo?` · ${esc(f.cargo)}`:''} · ${ehPj(f)?'PJ, sem INSS e IR':'CLT'}${f.admissao?` · admissão em ${fmtD(f.admissao)}`:''}. Nada da folha entra nas entradas, saídas ou no 13º da PJ.</span><span class="toolbar"><button class="btn ghost sm" data-act="editFunc" data-id="${f.id}" ${dis}>Editar funcionário</button>${S.canWrite?`<button class="btn ghost sm danger" data-act="delFunc" data-id="${f.id}">Excluir</button>`:''}</span></div>`;
+  const cab=`<div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>${esc(f.nome)}</b>${f.cargo?` · ${esc(f.cargo)}`:''} · ${ehPj(f)?'PJ, sem INSS e IR':'CLT'}${f.admissao?` · admissão em ${fmtD(f.admissao)}`:''}. Nada da folha entra nas entradas, saídas ou no 13º da PJ.</span><span class="toolbar">${c?`<button class="btn teal sm" data-act="pdfFunc" data-id="${f.id}">PDF do 13º e férias</button>`:''}<button class="btn ghost sm" data-act="editFunc" data-id="${f.id}" ${dis}>Editar funcionário</button>${S.canWrite?`<button class="btn ghost sm danger" data-act="delFunc" data-id="${f.id}">Excluir</button>`:''}</span></div>`;
   if(!c)return vFolha(y)+cab+`<div class="panel"><div class="empty"><b>Falta a data de admissão de ${esc(f.nome)}</b>Os meses antes da admissão não entram no 13º e nas férias.<div style="margin-top:14px"><button class="btn primary" data-act="editFunc" data-id="${f.id}" ${dis}>Informar data de admissão</button></div></div></div>`;
   const possiveis=Math.max(0,13-c.ini),sal=salDe(f);
   const rows=MESES.map((m,i)=>{const k=ym(y,i+1),v=c.vals[i];
@@ -553,6 +553,69 @@ function vClt(){
     <p class="note" style="margin:12px 0 0">Estimativa com as tabelas de 2026. O holerite é o valor oficial: o INSS das férias pode sair diferente, porque a empresa soma as férias ao salário do mês. ${c.deps||ehPj(f)?'':'Se houver dependentes no IR, informe em “Editar funcionário”.'}</p>
   </div></section>
   <section class="grid2">${vSalario(f)}${vDescontos(f)}</section>`;
+}
+/* PDF para o funcionário: quanto vai receber de 13º e de férias, e quando */
+// datas da lei: 13º em duas parcelas (até 30/11 e até 20/12, antecipando se não for dia útil); férias pagas até 2 dias antes do início
+function datasPagamento(y,f){
+  const p1=ajustar(iso(y,11,30),'anterior'),p2=ajustar(iso(y,12,20),'anterior');
+  let fer=null;if(f.feriasInicio){const d=toD(f.feriasInicio);d.setDate(d.getDate()-2);fer=ajustar(fromD(d),'anterior')}
+  return{p1,p2,fer};
+}
+function pdfFunc(f){
+  if(!f)return;
+  const y=S.ref.y,c=cltCalc(y,f);if(!c)return toast('Informe a data de admissão do funcionário primeiro.');
+  const m=marcaAtual(),key=m.logo==='key',nomeEmp=m.nome||(key?'Key Marketing':'');
+  const cor=!key&&COR.test(m.c1||'')?m.c1:'#3A2430',dest=!key&&COR.test(m.c2||'')?m.c2:'#E8628F';
+  const dt=datasPagamento(y,f),pj=ehPj(f);
+  const logo=key?KEY_SVG.replaceAll('fill="currentColor"','fill="#3A2430"'):m.logo?`<img src="${esc(m.logo)}" alt="">`:'';
+  const lin=(a,b,cls='')=>`<tr class="${cls}"><td>${a}</td><td class="n">${b}</td></tr>`;
+  const imp=l=>pj?lin('Sem INSS e IR (PJ)',brl(0)):lin('− INSS',brl(l.inss))+lin('− Imposto de Renda',brl(l.ir));
+  const outros13=nomesDesc('13',ym(y,12),f),outrosFer=nomesDesc('ferias',refYM(),f);
+  const doc=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>13º e férias ${y} – ${esc(f.nome)}</title>
+<style>
+@page{size:A4;margin:16mm}
+*{box-sizing:border-box}body{font-family:"Helvetica Neue",Arial,sans-serif;color:#2b2228;margin:0;font-size:12.5px;line-height:1.45}
+header{display:flex;align-items:center;gap:14px;border-bottom:3px solid ${dest};padding-bottom:12px}
+header svg,header img{height:46px;width:auto;max-width:150px;object-fit:contain}
+header b{font-size:18px;display:block}header small{color:#7a6c74}
+h1{font-size:20px;margin:22px 0 4px;color:${cor}}
+.sub{color:#6b5d65;margin:0 0 16px}
+.quem{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#f5f1f3;border-radius:8px;padding:10px 12px;margin-bottom:18px}
+.quem span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#7a6c74}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{border:1px solid #e2d9de;border-radius:10px;padding:14px;break-inside:avoid}
+.card h2{font-size:14px;margin:0 0 8px;color:${cor}}
+table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px solid #eee5ea}td.n{text-align:right;white-space:nowrap}
+tr.tot td{font-weight:700;font-size:15px;border-bottom:0;color:${cor}}
+.quando{margin-top:10px;background:${dest}1f;border-radius:8px;padding:8px 10px}
+.quando b{color:${cor}}
+.total{margin-top:16px;display:flex;justify-content:space-between;align-items:center;background:${cor};color:#fff;border-radius:10px;padding:12px 16px;font-size:15px}
+.total b{font-size:20px}
+.nota{color:#7a6c74;font-size:11px;margin-top:16px}
+footer{margin-top:24px;border-top:1px solid #e2d9de;padding-top:8px;display:flex;justify-content:space-between;color:#9a8c94;font-size:10px;letter-spacing:.08em}
+</style></head><body>
+<header>${logo}<div><b>${esc(nomeEmp)}</b>${m.cnpj&&!key?`<small>CNPJ ${esc(m.cnpj)}</small>`:''}</div></header>
+<h1>Seu 13º e suas férias em ${y}</h1>
+<p class="sub">Demonstrativo do que você vai receber e das datas de pagamento.</p>
+<div class="quem"><div><span>Funcionário</span>${esc(f.nome)}</div><div><span>Cargo</span>${esc(f.cargo||'—')}</div><div><span>CPF</span>${esc(f.cpf||'—')}</div><div><span>Admissão</span>${fmtD(f.admissao)}</div></div>
+<div class="cards">
+ <div class="card"><h2>13º salário</h2><table>
+  ${lin(`Valor bruto<br><small>média de ${c.n} ${c.n===1?'mês':'meses'} de ${y}</small>`,brl(c.l13.bruto))}${imp(c.l13)}${c.l13.outros?lin(`− Outros descontos<br><small>${esc(outros13)}</small>`,brl(c.l13.outros)):''}
+  ${lin('Você recebe',brl(c.l13.liq),'tot')}</table>
+  <div class="quando">${pj?`<b>Quando:</b> até ${fmtD(dt.p2)}`:`<b>1ª parcela:</b> ${brl(c.parc1)} até ${fmtD(dt.p1)}<br><b>2ª parcela:</b> ${brl(c.parc2)} até ${fmtD(dt.p2)}`}</div></div>
+ <div class="card"><h2>Férias + 1/3</h2><table>
+  ${lin(`Valor bruto<br><small>férias ${brl(c.dec)} + 1/3 ${brl(c.terco)}</small>`,brl(c.lFer.bruto))}${imp(c.lFer)}${c.lFer.outros?lin(`− Outros descontos<br><small>${esc(outrosFer)}</small>`,brl(c.lFer.outros)):''}
+  ${lin('Você recebe',brl(c.lFer.liq),'tot')}</table>
+  <div class="quando">${dt.fer?`<b>Quando:</b> até ${fmtD(dt.fer)}, 2 dias antes do início das férias (${fmtD(f.feriasInicio)})`:'<b>Quando:</b> até 2 dias antes do início das férias, ainda a combinar'}</div></div>
+</div>
+<div class="total"><span>Total de 13º e férias</span><b>${brl(c.l13.liq+c.lFer.liq)}</b></div>
+<p class="nota">Valores estimados com as tabelas de INSS e IR de 2026 e os salários lançados até agora. O holerite emitido pela empresa é o documento oficial e pode ter pequenas diferenças.</p>
+<footer><span>Emitido em ${fmtD(hoje())}</span><span>AIME FINANCY</span></footer>
+<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>
+</body></html>`;
+  const w=window.open('','_blank');
+  if(!w)return toast('O navegador bloqueou a janela do PDF. Libere pop-ups para este site.');
+  w.document.open();w.document.write(doc);w.document.close();
 }
 const APLICA={salario:'Salário (todo mês)',ambos:'13º e férias','13':'Só no 13º',ferias:'Só nas férias'};
 // salário do mês escolhido no topo (ou o último lançado antes dele), do bruto ao líquido
@@ -1055,6 +1118,7 @@ const F={
     {k:'regime',l:'Regime',type:'select',opts:[['clt','CLT (desconta INSS e IR)'],['pj','PJ (sem INSS e IR)']]},
     {k:'admissao',l:'Data de admissão',type:'date',req:1,help:'Meses antes não entram no 13º e nas férias.'},
     {k:'dependentes',l:'Dependentes no IR',type:'number',help:'0 se nenhum'},
+    {k:'feriasInicio',l:'Início das próximas férias',type:'date',help:'Para o PDF: o pagamento sai até 2 dias antes'},
     {k:'obs',l:'Observação',type:'text',full:1},
     {k:'eu',l:'Sou eu: entra no quadro “Seu fim de ano”',type:'check',def:false},
     {k:'ativo',l:'Ativo (desmarque quando a pessoa sair da empresa)',type:'check'}]},
@@ -1211,6 +1275,7 @@ async function act(a,id,btn){
     case'novoFunc':return openForm('func',null,{regime:'clt',dependentes:0,ativo:true,eu:false});
     case'editFunc':return openForm('func',S.func.find(x=>x.id===id));
     case'verFunc':S.funcSel=id;lembrarFunc();render();return;
+    case'pdfFunc':return pdfFunc(S.func.find(x=>x.id===id));
     case'marca':return openForm('marca',S.config,{corPrincipal:'#3A2430',corDestaque:'#E8628F'});
     case'editDesc':return openForm('desconto',S.desc.find(x=>x.id===id));
     case'gerarFixas':{const novos=fixasDoMes(S.ref.y,S.ref.m).filter(x=>!S.lanc.some(l=>l.id===x.id));for(const x of novos){const d={...x};delete d.id;await put('lancamentos',x.id,d)}return toast(`${novos.length} conta${novos.length===1?' fixa criada':'s fixas criadas'} como saída a pagar`)}
