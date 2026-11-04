@@ -1048,14 +1048,15 @@ function guardar(col,row){
 }
 async function put(col,id,data){
   if(!S.db)throw{code:'no_db'};
-  const row=toRow(col,{...data,id});row.atualizado_em=new Date().toISOString();
-  const{data:saved,error}=await sb.from(col).upsert(row).select().single();
+  const row=toRow(col,{...data,id});row.atualizado_em=new Date().toISOString();row.dono=S.uid;
+  // cada conta tem os próprios dados: a chave é (dono, id)
+  const{data:saved,error}=await sb.from(col).upsert(row,{onConflict:col==='beneficios'?'dono,ano':'dono,id'}).select().single();
   if(error)throw error;
   guardar(col,saved);later();
 }
 async function del(col,id){
   if(!S.db)throw{code:'no_db'};
-  const{error}=await sb.from(col).delete().eq('id',id);
+  const{error}=await sb.from(col).delete().eq('dono',S.uid).eq('id',id);
   if(error)throw error;
   if(col==='clt_salarios')delete S.clt[id];
   const k=KEY[col];if(k)S[k]=S[k].filter(x=>x.id!==id);later();
@@ -1203,14 +1204,14 @@ async function atualizarDas(){
 async function entrou(session){
   document.getElementById('login').hidden=true;
   document.getElementById('btnSair').hidden=false;
-  S.db=sb;S.email=session.user.email;
+  S.db=sb;S.email=session.user.email;S.uid=session.user.id;
   const{data:ok,error}=await sb.rpc('eh_membro');
   if(error){console.error(error);S.offline=true;render();return}
   S.semAcesso=!ok;S.canWrite=!!ok;
   if(ok)await carregar();else render();
 }
 function pedirLogin(){
-  S.db=null;S.lanc=[];S.notas=[];S.obrig=[];S.modelos=[];S.benef={};S.clt={};S.desc=[];S.semAcesso=false;
+  S.db=null;S.uid=null;S.email=null;S.lanc=[];S.notas=[];S.obrig=[];S.modelos=[];S.benef={};S.clt={};S.desc=[];S.config={aliquota:6};S.semAcesso=false;
   document.getElementById('btnSair').hidden=true;
   document.getElementById('login').hidden=false;
   render();setTimeout(()=>document.getElementById('lgEmail').focus(),30);
@@ -1222,7 +1223,7 @@ const lgMsg=(t,tipo)=>{const el=document.getElementById('lgMsg');el.textContent=
 document.getElementById('lgTroca').onclick=()=>{
   criando=!criando;lgMsg('');
   document.getElementById('loginTitulo').textContent=criando?'Criar minha conta':'Entrar no financeiro';
-  document.getElementById('loginSub').textContent=criando?'A primeira conta criada fica com acesso aos dados da empresa. Senha com pelo menos 8 caracteres.':'Use o e-mail e a senha da sua conta.';
+  document.getElementById('loginSub').textContent=criando?'Cada conta tem o seu próprio financeiro: ninguém vê os dados de outra pessoa. Senha com pelo menos 8 caracteres.':'Use o e-mail e a senha da sua conta.';
   document.getElementById('lgBtn').textContent=criando?'Criar conta':'Entrar';
   document.getElementById('lgTroca').textContent=criando?'Já tenho conta. Entrar':'Primeiro acesso? Criar minha conta';
   document.getElementById('lgSenha').autocomplete=criando?'new-password':'current-password';

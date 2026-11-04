@@ -16,14 +16,10 @@ A chave que aparece no `index.html` é a chave **pública** do Supabase. Ela soz
 
 ## Quem tem acesso
 
-- A **primeira conta criada** no painel fica com acesso automaticamente.
-- Qualquer outra conta consegue entrar, mas não vê nem altera dados.
-- Para liberar mais alguém, rode no SQL Editor do Supabase, depois que a pessoa criar a conta:
-
-```sql
-insert into public.membros (user_id, email)
-select id, email from auth.users where email = 'email-da-pessoa@exemplo.com';
-```
+- Qualquer pessoa pode criar a própria conta em "Primeiro acesso? Criar minha conta".
+- **Cada conta tem o seu próprio financeiro.** Toda tabela tem a coluna `dono` (o usuário que criou a linha), e as regras de acesso (RLS) só deixam cada conta ler e alterar as próprias linhas. Uma conta não vê nada das outras.
+- A chave de cada tabela é `(dono, id)` (em `beneficios`, `(dono, ano)`), então duas contas podem ter, por exemplo, o mesmo `das-2026-11`.
+- Conta nova já começa com a configuração (alíquota 6%) e com DAS e DEFIS cadastrados. Isso é feito pela função `primeiro_membro`, no gatilho `ao_criar_usuario`.
 
 ## Tabelas
 
