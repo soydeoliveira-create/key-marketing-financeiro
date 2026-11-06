@@ -576,7 +576,7 @@ function vReserva(y){
   const mes=soma(r=>r.doMes&&r.doMes.valor),ate=soma(r=>r.ate),ano=soma(r=>r.anoTodo),falta=soma(r=>r.falta);
   const temClt=rs.some(r=>!ehPj(r.f)),temEst=rs.some(r=>r.doMes&&r.doMes.est);
   return `<div class="panel">
-    <div class="ph"><h2>Reserva do 13º · ${nm} de ${y}</h2><div class="toolbar"><span class="hint">${S.config.reservaAuto===false?'envio automático desligado':`vai por e-mail todo dia 5 para ${esc(S.config.reservaEmail||S.email||'você')}`}</span><button class="btn teal sm" data-act="reservaEmail" title="Abre o seu e-mail com o resumo da reserva do mês">Mandar por e-mail</button><button class="btn ghost sm" data-act="reservaZap" title="Abre o WhatsApp com o resumo">WhatsApp</button><button class="btn ghost sm" data-act="reservaCopiar">Copiar</button></div></div>
+    <div class="ph"><h2>Reserva do 13º · ${nm} de ${y}</h2><div class="toolbar"><span class="hint">quanto separar para o 13º</span><button class="btn teal sm" data-act="reservaEmail" title="Abre o seu e-mail com o resumo da reserva do mês">Mandar por e-mail</button><button class="btn ghost sm" data-act="reservaZap" title="Abre o WhatsApp com o resumo">WhatsApp</button><button class="btn ghost sm" data-act="reservaCopiar">Copiar</button></div></div>
     <section class="kpis" style="margin:0 0 14px">
       <div class="kpi hl"><div class="lbl">Guardar em ${nm}</div><div class="val">${brl(mes)}</div><div class="sub">todos os funcionários</div></div>
       <div class="kpi"><div class="lbl">Guardado até ${nm}</div><div class="val">${brl(ate)}</div><div class="sub">o que já devia estar separado</div></div>
@@ -1247,9 +1247,7 @@ const F={
     {k:'logo',l:'Logo',type:'logo',full:1,help:'PNG, JPG ou SVG. Em branco mantém o logo atual. As cores só valem com logo próprio.'},
     {k:'corPrincipal',l:'Cor principal',type:'color',help:'Faixa do resumo e destaques escuros'},
     {k:'corDestaque',l:'Cor de destaque',type:'color',help:'Botões e abas'},
-    {k:'modo',l:'Tipo de uso',type:'select',full:1,opts:[['rh','RH: só funcionários, 13º, férias e relatórios'],['completo','Financeiro completo: entradas, notas, impostos e funcionários']]},
-    {k:'reservaAuto',l:'Mandar a reserva do 13º por e-mail todo dia 5',type:'check',def:true,so:'rh'},
-    {k:'reservaEmail',l:'E-mail que recebe a reserva',type:'text',full:1,so:'rh',ph:'Em branco: o e-mail desta conta',help:'Para mais de uma pessoa, separe os e-mails com vírgula.'}]},
+    {k:'modo',l:'Tipo de uso',type:'select',full:1,opts:[['rh','RH: só funcionários, 13º, férias e relatórios'],['completo','Financeiro completo: entradas, notas, impostos e funcionários']]}]},
   inicio:{t:'início da PJ',f:[
     {k:'inicioPj',l:'Mês em que a PJ começou',type:'month',req:1,full:1,help:'Meses anteriores não entram no 13º e nas férias. Nos anos seguintes a conta começa em janeiro.'}]}
 };
