@@ -606,15 +606,18 @@ function vClt(){
   const cab=`<div class="banner" style="background:var(--teal-soft);color:var(--teal-ink);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>${esc(f.nome)}</b>${f.cargo?` · ${esc(f.cargo)}`:''} · ${ehPj(f)?'PJ, sem INSS e IR':'CLT'}${f.admissao?` · admissão em ${fmtD(f.admissao)}`:''}.${modoRH()?'':' Nada da folha entra nas entradas, saídas ou no 13º da PJ.'}</span><span class="toolbar">${c?`<button class="btn teal sm" data-act="pdfFunc" data-id="${f.id}">PDF do 13º e férias</button>`:''}<button class="btn ghost sm" data-act="editFunc" data-id="${f.id}" ${dis}>Editar funcionário</button>${S.canWrite?`<button class="btn ghost sm danger" data-act="delFunc" data-id="${f.id}">Excluir</button>`:''}</span></div>`;
   if(!c)return vFolha(y)+cab+`<div class="panel"><div class="empty"><b>Falta a data de admissão de ${esc(f.nome)}</b>Os meses antes da admissão não entram no 13º e nas férias.<div style="margin-top:14px"><button class="btn primary" data-act="editFunc" data-id="${f.id}" ${dis}>Informar data de admissão</button></div></div></div>`;
   const possiveis=Math.max(0,13-c.ini),sal=salDe(f);
-  // quanto guardar por mês: 13º + férias estimados, divididos pelos meses do ano desde a admissão
-  const g13=possiveis&&c.n?r2(c.dec/possiveis):0,gFer=possiveis&&c.n?r2(c.fer/possiveis):0,guardar=r2(g13+gFer);
+  // quanto guardar em cada mês, proporcional ao salário daquele mês:
+  // 13º = salário ÷ meses do ano desde a admissão (12 num ano cheio = 1/12); férias = parte do 13º + 1/3
+  // com todos os meses lançados, a soma dá exatamente o 13º e as férias estimados
+  const reserva=v=>{if(!v||!possiveis)return null;const t=r2(v/possiveis*7/3),d=r2(v/possiveis);return{d,fe:r2(t-d),t}};
+  const res=c.vals.map(reserva),guardado=r2(res.reduce((a,x)=>a+(x?x.t:0),0)),guardar=guardado>0;
   const mostraLiq=!ehPj(f); // no PJ o líquido é igual ao bruto: a coluna de guardar entra no lugar
-  const colGuardar=`<td class="num">${guardar?`<b class="pos">${brl(guardar)}</b><div class="muted">13º ${brl(g13)} · férias ${brl(gFer)}</div>`:'<span class="muted">—</span>'}</td>`;
+  const colGuardar=x=>`<td class="num">${x?`<b class="pos">${brl(x.t)}</b><div class="muted">13º ${brl(x.d)} · férias ${brl(x.fe)}</div>`:'<span class="muted">—</span>'}</td>`;
   const rows=MESES.map((m,i)=>{const k=ym(y,i+1),v=c.vals[i];
     if(i+1<c.ini)return `<tr class="zero"><td style="text-transform:capitalize">${m}</td><td class="num"><span class="muted">antes da admissão</span></td>${mostraLiq?'<td></td>':''}<td></td></tr>`;
     const lq=v?salarioLiquido(k,f):null;
     return `<tr class="${v?'':'zero'}"><td style="text-transform:capitalize">${m}</td><td class="num"><input id="clt-${esc(f.id)}-${k}" data-clt="${k}" data-f="${esc(f.id)}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${v||''}" aria-label="Salário bruto de ${m} de ${esc(f.nome)}" ${dis}></td>
-      ${mostraLiq?`<td class="num">${lq?`<b>${brl(lq.liq)}</b>${lq.outros?`<div class="muted">− ${brl(lq.outros)} de descontos</div>`:''}`:'<span class="muted">—</span>'}</td>`:''}${colGuardar}</tr>`}).join('');
+      ${mostraLiq?`<td class="num">${lq?`<b>${brl(lq.liq)}</b>${lq.outros?`<div class="muted">− ${brl(lq.outros)} de descontos</div>`:''}`:'<span class="muted">—</span>'}</td>`:''}${colGuardar(res[i])}</tr>`}).join('');
   const liqAno=MESES.reduce((a,_,i)=>{const k=ym(y,i+1);return a+(i+1>=c.ini&&sal[k]>0?salarioLiquido(k,f).liq:0)},0);
   const irOp=`${c.deps?`${c.deps} dependente${c.deps>1?'s':''} · `:''}com a redução de 2026`;
   const linhasImp=l=>ehPj(f)?`<div><span>Sem INSS e IR<span class="op">funcionário PJ</span></span><b>${brl(0)}</b></div>`:`<div><span>− INSS<span class="op">tabela progressiva, 7,5% a 14%</span></span><b class="neg">${brl(l.inss)}</b></div>
@@ -630,8 +633,8 @@ function vClt(){
   <div class="panel">
     <div class="ph"><h2>Salários de ${esc(f.nome)} em ${y}</h2><span class="hint">valor bruto do holerite</span></div>
     <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Salário bruto</th>${mostraLiq?'<th class="num">Líquido</th>':''}<th class="num" title="Valor estimado para guardar todo mês para pagar o 13º e as férias">Guardar no mês</th></tr></thead><tbody>${rows}</tbody>
-    <tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td>${mostraLiq?`<td class="num">${brl(liqAno)}</td>`:''}<td class="num">${guardar?brl(c.total):'—'}</td></tr></tfoot></table></div>
-    <p class="note" style="margin:12px 0 0">${guardar?`<b>Guardar no mês</b>: guardando ${brl(guardar)} em cada mês de ${MESES[c.ini-1]} a dezembro, você junta ${brl(c.total)}, o 13º e as férias + 1/3 estimados. O valor muda conforme novos salários entram na média. `:''}Lance o <b>total de vencimentos</b> do holerite, antes dos descontos. Mês em branco não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
+    <tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td>${mostraLiq?`<td class="num">${brl(liqAno)}</td>`:''}<td class="num">${guardar?`<b>${brl(guardado)}</b>`:'—'}</td></tr></tfoot></table></div>
+    <p class="note" style="margin:12px 0 0">${guardar?`<b>Guardar no mês</b> é proporcional ao salário de cada mês: 13º = salário ÷ ${possiveis} (meses de ${MESES[c.ini-1]} a dezembro)${possiveis===12?', ou seja, 1/12':''}; férias = esse valor + 1/3. Até agora, ${brl(guardado)} guardados. Com todos os meses lançados, a soma fecha no 13º e nas férias estimados (${brl(c.total)} hoje). `:''}Lance o <b>total de vencimentos</b> do holerite, antes dos descontos. Mês em branco não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
   </div>
   <div class="panel">
     <div class="ph"><h2>Como o cálculo é feito</h2></div>
