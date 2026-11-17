@@ -1572,6 +1572,18 @@ async function boot(){
   });
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.db&&!S.semAcesso&&!modal)carregar()});
 }
+// o navegador às vezes guarda a página antiga: se a publicada for diferente desta, recarrega uma vez com a nova
+async function versaoNova(){
+  try{
+    const atual=document.currentScript||[...document.scripts].find(s=>s.textContent.includes('function versaoNova'));
+    const meu=(atual||{}).textContent||'';if(!meu)return;
+    const r=await fetch(location.pathname+'?nc='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const txt=await r.text();if(txt.includes(meu.trim()))return;
+    const k='financy-recarregou',ja=sessionStorage.getItem(k);if(ja===String(txt.length))return;
+    sessionStorage.setItem(k,String(txt.length));location.replace(location.pathname+'?v='+Date.now()+location.hash);
+  }catch(_){}
+}
+versaoNova();
 boot();
 })();
 </script>
