@@ -640,7 +640,7 @@ function vClt(){
   <div class="panel">
     <div class="ph"><h2>Como o cálculo é feito</h2></div>
     <div class="calc">
-      <div><span>Soma do ano<span class="op">${c.ini>1&&c.ini<=12?`de ${MESES[c.ini-1]} a dezembro`:'todos os meses lançados'}</span></span><b>${brl(c.soma)}</b></div>
+      <div><span>Soma do ano<span class="op">${modoRH()?'soma dos meses lançados':c.ini>1&&c.ini<=12?`de ${MESES[c.ini-1]} a dezembro`:'todos os meses lançados'}</span></span><b>${brl(c.soma)}</b></div>
       ${modoRH()?`<div><span>÷ 12<span class="op">1/12 de cada salário lançado (${c.n} ${c.n===1?'mês':'meses'})</span></span><b>12</b></div>
       <div><span><b>13º salário</b><span class="op">proporcional aos meses lançados</span></span><span class="big">${brl(c.dec)}</span></div>`:`<div><span>÷ número de meses<span class="op">meses com salário</span></span><b>${c.n}</b></div>
       <div><span><b>13º salário</b><span class="op">soma ÷ meses</span></span><span class="big">${brl(c.dec)}</span></div>`}
