@@ -476,7 +476,7 @@ function render(){
   if(fid){const el=document.getElementById(fid);if(el){if(fval!==undefined&&el.value!==fval)el.value=fval;el.focus()}}
 }
 
-/* 13º e férias: média do que a PJ recebeu no ano */
+/* 13º e férias: 1/12 de cada mês que a PJ recebeu (soma ÷ 12) */
 function benefMeses(y){return(S.benef[String(y)]||{}).meses||{}}
 /* ---------- CLT (pessoa física): separada da PJ ---------- */
 // Tabelas de 2026. INSS: Portaria Interministerial MPS/MF 13/2026. IR: Receita Federal + redução da Lei 15.270/2025.
@@ -511,10 +511,9 @@ function cltCalc(y,f){
   const ini=y<admY?13:y===admY?admM:1,sal=salDe(f);
   const vals=MESES.map((_,i)=>i+1>=ini?(sal[ym(y,i+1)]||0):0);
   const n=vals.filter(v=>v>0).length,soma=vals.reduce((a,b)=>a+b,0);
-  // empresas (modo RH): tudo proporcional aos meses lançados. 13º = 1/12 de cada salário lançado (soma ÷ 12),
-  // férias = 13º + 1/3; é exatamente a soma do "Guardar no mês". Nada de meses futuros.
-  // A Key (modo completo) segue a regra dela: a média dos meses
-  const media=n?soma/n:0,dec=modoRH()?soma/12:media,terco=dec/3,fer=dec+terco;
+  // regra única (empresas e Key, desde 18/11/2026): tudo proporcional aos meses lançados. 13º = 1/12 de cada salário
+  // lançado (soma ÷ 12), férias = 13º + 1/3; é exatamente a soma do "Guardar no mês". Nada de meses futuros.
+  const media=n?soma/n:0,dec=soma/12,terco=dec/3,fer=dec+terco;
   const deps=+f.dependentes||0;
   // outros descontos (plano de saúde, empréstimo…) saem do líquido
   // o 13º é pago em dezembro: vale o desconto ativo em dezembro; nas férias, o que estiver ativo no mês escolhido no topo
@@ -609,7 +608,7 @@ function vClt(){
   // 13º = salário ÷ meses do ano desde a admissão (12 num ano cheio = 1/12); férias = parte do 13º + 1/3
   // com todos os meses lançados, a soma dá exatamente o 13º e as férias estimados
   // regra fixa nas empresas (modo RH): guardar no mês = 1/12 do salário lançado (13º) + esse valor + 1/3 (férias)
-  const div=modoRH()?12:possiveis;
+  const div=12;
   const reserva=v=>{if(!v||!div)return null;const t=r2(v/div*7/3),d=r2(v/div);return{d,fe:r2(t-d),t}};
   const res=c.vals.map(reserva),guardado=r2(res.reduce((a,x)=>a+(x?x.t:0),0)),guardar=guardado>0;
   const mostraLiq=!ehPj(f); // no PJ o líquido é igual ao bruto: a coluna de guardar entra no lugar
@@ -635,15 +634,14 @@ function vClt(){
     <div class="ph"><h2>Salários de ${esc(f.nome)} em ${y}</h2><span class="hint">valor bruto do holerite</span></div>
     <div class="tw"><table class="bm"><thead><tr><th>Mês</th><th class="num">Salário bruto</th>${mostraLiq?'<th class="num">Líquido</th>':''}<th class="num" title="Valor estimado para guardar todo mês para pagar o 13º e as férias">Guardar no mês</th></tr></thead><tbody>${rows}</tbody>
     <tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td>${mostraLiq?`<td class="num">${brl(liqAno)}</td>`:''}<td class="num">${guardar?`<b>${brl(guardado)}</b>`:'—'}</td></tr></tfoot></table></div>
-    <p class="note" style="margin:12px 0 0">${guardar?`<b>Guardar no mês</b> é proporcional ao salário de cada mês: 13º = salário ÷ ${div}${div===12?', ou seja, 1/12':` (meses de ${MESES[c.ini-1]} a dezembro)`}; férias = esse valor + 1/3. Até agora, ${brl(guardado)} guardados${modoRH()?', igual ao 13º + férias de hoje':`. Com todos os meses lançados, a soma fecha no 13º e nas férias estimados (${brl(c.total)} hoje)`}. `:''}Lance o <b>total de vencimentos</b> do holerite, antes dos descontos. Mês em branco não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
+    <p class="note" style="margin:12px 0 0">${guardar?`<b>Guardar no mês</b> é proporcional ao salário de cada mês: 13º = salário ÷ ${div}${div===12?', ou seja, 1/12':` (meses de ${MESES[c.ini-1]} a dezembro)`}; férias = esse valor + 1/3. Até agora, ${brl(guardado)} guardados, igual ao 13º + férias de hoje. `:''}Lance o <b>total de vencimentos</b> do holerite, antes dos descontos. Mês em branco não entra no 13º nem nas férias. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
   </div>
   <div class="panel">
     <div class="ph"><h2>Como o cálculo é feito</h2></div>
     <div class="calc">
-      <div><span>Soma do ano<span class="op">${modoRH()?'soma dos meses lançados':c.ini>1&&c.ini<=12?`de ${MESES[c.ini-1]} a dezembro`:'todos os meses lançados'}</span></span><b>${brl(c.soma)}</b></div>
-      ${modoRH()?`<div><span>÷ 12<span class="op">1/12 de cada salário lançado (${c.n} ${c.n===1?'mês':'meses'})</span></span><b>12</b></div>
-      <div><span><b>13º salário</b><span class="op">proporcional aos meses lançados</span></span><span class="big">${brl(c.dec)}</span></div>`:`<div><span>÷ número de meses<span class="op">meses com salário</span></span><b>${c.n}</b></div>
-      <div><span><b>13º salário</b><span class="op">soma ÷ meses</span></span><span class="big">${brl(c.dec)}</span></div>`}
+      <div><span>Soma do ano<span class="op">soma dos meses lançados</span></span><b>${brl(c.soma)}</b></div>
+      <div><span>÷ 12<span class="op">1/12 de cada salário lançado (${c.n} ${c.n===1?'mês':'meses'})</span></span><b>12</b></div>
+      <div><span><b>13º salário</b><span class="op">proporcional aos meses lançados</span></span><span class="big">${brl(c.dec)}</span></div>
       <div><span>+ 1/3 de férias<span class="op">13º ÷ 3</span></span><b>${brl(c.terco)}</b></div>
       <div><span><b>Férias</b><span class="op">13º + 1/3</span></span><span class="big pos">${brl(c.fer)}</span></div>
       <div><span><b>Total bruto</b><span class="op">13º + férias</span></span><span class="big">${brl(c.total)}</span></div>
@@ -700,7 +698,7 @@ function pdfFuncs(lista){
 <div class="quem"><div><span>Funcionário</span>${esc(f.nome)}</div><div><span>Cargo</span>${esc(f.cargo||'—')}</div><div><span>CPF</span>${esc(f.cpf||'—')}</div><div><span>Admissão</span>${fmtD(f.admissao)}</div></div>
 <div class="cards">
  <div class="card"><h2>13º salário</h2><table>
-  ${lin(`Valor bruto<br><small>${modoRH()?`1/12 de ${c.n} ${c.n===1?'salário lançado':'salários lançados'} em ${y}`:`média de ${c.n} ${c.n===1?'mês':'meses'} de ${y}`}</small>`,brl(c.l13.bruto))}${imp(c.l13)}${c.l13.outros?lin(`− Outros descontos<br><small>${esc(outros13)}</small>`,brl(c.l13.outros)):''}
+  ${lin(`Valor bruto<br><small>1/12 de ${c.n} ${c.n===1?'salário lançado':'salários lançados'} em ${y}</small>`,brl(c.l13.bruto))}${imp(c.l13)}${c.l13.outros?lin(`− Outros descontos<br><small>${esc(outros13)}</small>`,brl(c.l13.outros)):''}
   ${lin('Você recebe',brl(c.l13.liq),'tot')}</table>
   <div class="quando">${pj?`<b>Quando:</b> até ${fmtD(dt.p2)}`:`<b>1ª parcela:</b> ${brl(c.parc1)} até ${fmtD(dt.p1)}<br><b>2ª parcela:</b> ${brl(c.parc2)} até ${fmtD(dt.p2)}`}</div></div>
  <div class="card"><h2>Férias + 1/3</h2><table>
@@ -802,7 +800,8 @@ function calcBenef(y){
   const ini=mesInicial(y),ms=benefMeses(y);
   const vals=MESES.map((_,i)=>i+1>=ini?(+ms[pad(i+1)]||0):0);
   const n=vals.filter(v=>v>0).length,soma=vals.reduce((a,b)=>a+b,0);
-  const dec=n?soma/n:0,terco=dec/3,fer=dec+terco;
+  // mesma regra dos funcionários (18/11/2026): 13º = soma dos meses lançados ÷ 12; férias = 13º + 1/3
+  const dec=soma/12,terco=dec/3,fer=dec+terco;
   return{ini,vals,n,soma,dec,terco,fer,total:dec+fer};
 }
 function vBeneficios(){
@@ -816,8 +815,8 @@ function vBeneficios(){
   <section class="kpis">
     <div class="kpi"><div class="lbl">Recebido em ${y}</div><div class="val">${brl(c.soma)}</div><div class="sub">soma dos meses lançados</div></div>
     <div class="kpi"><div class="lbl">Meses lançados</div><div class="val">${c.n}</div><div class="sub">de ${possiveis}${c.ini>1&&c.ini<=12?` (${MESES[c.ini-1].slice(0,3)} a dez)`:''}</div></div>
-    <div class="kpi hl"><div class="lbl">13º salário</div><div class="val">${brl(c.dec)}</div><div class="sub">média mensal</div></div>
-    <div class="kpi"><div class="lbl">Férias + 1/3</div><div class="val pos">${brl(c.fer)}</div><div class="sub">média + ${brl(c.terco)}</div></div>
+    <div class="kpi hl"><div class="lbl">13º salário</div><div class="val">${brl(c.dec)}</div><div class="sub">1/12 do que foi lançado</div></div>
+    <div class="kpi"><div class="lbl">Férias + 1/3</div><div class="val pos">${brl(c.fer)}</div><div class="sub">13º + ${brl(c.terco)}</div></div>
   </section>
   <section class="grid2">
   <div class="panel">
@@ -831,20 +830,20 @@ function vBeneficios(){
       <td class="num"><span class="muted">${e?brl(e):'—'}</span></td></tr>`}).join('')}
     </tbody><tfoot><tr><td>Total</td><td class="num">${brl(c.soma)}</td><td></td></tr></tfoot></table></div>
     <p class="note" style="margin:12px 0 0">Só o recebimento do dia 5 entra nesta conta. Em “Entradas e saídas”, a entrada do dia 5 já vem marcada como <b>Conta para 13º e férias</b>. Se o pagamento cair em outro dia, marque a caixa na mão. Os demais recebimentos do mês ficam fora.</p>
-    <p class="note" style="margin:8px 0 0">Mês em branco ou zerado não entra na média. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
+    <p class="note" style="margin:8px 0 0">Mês em branco ou zerado não entra no 13º nem nas férias. O valor é salvo assim que você sai do campo. Use as setas do topo para trocar de ano.</p>
   </div>
   <div class="panel">
     <div class="ph"><h2>Como o cálculo é feito</h2></div>
     <div class="calc">
-      <div><span>Soma do ano<span class="op">${c.ini>1&&c.ini<=12?`de ${MESES[c.ini-1]} a dezembro`:'todos os meses lançados'}</span></span><b>${brl(c.soma)}</b></div>
-      <div><span>÷ número de meses<span class="op">meses com valor</span></span><b>${c.n}</b></div>
-      <div><span><b>13º salário</b><span class="op">soma ÷ meses</span></span><span class="big">${brl(c.dec)}</span></div>
+      <div><span>Soma do ano<span class="op">soma dos meses lançados</span></span><b>${brl(c.soma)}</b></div>
+      <div><span>÷ 12<span class="op">1/12 de cada mês lançado (${c.n} ${c.n===1?'mês':'meses'})</span></span><b>12</b></div>
+      <div><span><b>13º salário</b><span class="op">proporcional aos meses lançados</span></span><span class="big">${brl(c.dec)}</span></div>
       <div><span>+ 1/3 de férias<span class="op">13º ÷ 3</span></span><b>${brl(c.terco)}</b></div>
       <div><span><b>Férias</b><span class="op">13º + 1/3</span></span><span class="big pos">${brl(c.fer)}</span></div>
       <div><span>− DAS que fica na conta<span class="op">${aliqTxt()} do 13º e das férias</span></span><b>− ${brl(dasDe(c.dec)+dasDe(c.fer))}</b></div>
       <div><span><b>Livre</b><span class="op">13º ${brl(semDas(c.dec))} + férias ${brl(semDas(c.fer))}</span></span><span class="big pos">${brl(semDas(c.dec)+semDas(c.fer))}</span></div>
       <div><span><b>Total a reservar</b><span class="op">13º + férias</span></span><span class="big">${brl(c.total)}</span></div>
-      <div><span>Guardar por mês<span class="op">total ÷ 12</span></span><b>${brl(c.total/12)}</b></div>
+      ${(()=>{const v=c.vals[S.ref.m-1]||0;return v?`<div><span>Guardar em ${MESES[S.ref.m-1]}<span class="op">13º ${brl(v/12)} (recebido ÷ 12) + férias ${brl(v/12*4/3)} (+ 1/3)</span></span><b>${brl(v/12*7/3)}</b></div>`:''})()}
     </div>
   </div></section>`;
 }
@@ -920,7 +919,7 @@ function vResumoAno(){
   const blocoPg=pg.itens.length?`<div class="rcol full"><h3>O que você vai pagar até dezembro</h3>
       ${pg.itens.map(i=>`<div class="rp"><time>${fmtD(i.d).slice(0,5)}</time><span>${esc(i.n)}<small>${i.k}${i.est?' · estimado':''}${i.d<hoje()?' · vencido':''}</small></span><b>${i.v?brl(i.v):'<small>a definir</small>'}</b></div>`).join('')}
       <div class="rl tot"><span>Total a pagar</span><b>${brl(pg.total)}</b></div></div>`:'';
-  const subPj=r.temPj?`sem o DAS de ${aliqTxt()} · média de ${r.pj.n} ${r.pj.n===1?'mês':'meses'}`:'sem recebimentos lançados';
+  const subPj=r.temPj?`sem o DAS de ${aliqTxt()} · 1/12 de ${r.pj.n} ${r.pj.n===1?'mês':'meses'}`:'sem recebimentos lançados';
   return `<section class="resumo" aria-label="Resumo de 13º e férias de ${y}">
     <div class="rh"><div><span class="spaced">Seu fim de ano</span><h2>O que você vai receber em ${y}</h2></div><div class="rt"><small>Total</small><b>${brl(r.tot)}</b></div></div>
     <p class="frase">${frase}</p>
