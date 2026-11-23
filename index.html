@@ -88,6 +88,7 @@ body.futuro .brand .cnpj{color:rgba(255,255,255,.62);font-variant-numeric:tabula
 body.futuro .month,body.futuro .sair{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.22);color:#fff;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 body.futuro .month button{color:rgba(255,255,255,.8)}
 body.futuro .month button:hover,body.futuro .sair:hover{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.4)}
+body.futuro .sair .quem{color:rgba(255,255,255,.7)}
 body.futuro nav.tabs{border-bottom-color:transparent;margin-top:26px}
 body.futuro nav.tabs button{color:rgba(255,255,255,.66)}
 body.futuro nav.tabs button:hover{color:#fff}
@@ -279,6 +280,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
 .login .troca{background:none;border:0;color:var(--pink-ink);font-weight:600;cursor:pointer;padding:0;font-size:14px;justify-self:start}
 .sair{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:13px;color:var(--ink-2)}
 .sair:hover{color:var(--ink);border-color:var(--ink-3)}
+.sair .quem{font-weight:500;color:var(--ink-3);margin-left:4px;display:inline-block;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
 .toprt{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;font-size:14px;z-index:60;box-shadow:var(--shadow)}
 
@@ -1538,8 +1540,9 @@ async function atualizarDas(){
 }
 async function entrou(session){
   document.getElementById('login').hidden=true;
-  document.getElementById('btnSair').hidden=false;
   S.db=sb;S.email=session.user.email;S.uid=session.user.id;
+  // mostra qual conta está aberta, para não confundir a da Key com a de outra empresa
+  {const b=document.getElementById('btnSair');b.hidden=false;b.disabled=false;b.title='Sair da conta '+S.email;b.innerHTML=`Sair <small class="quem">${esc(S.email)}</small>`}
   const{data:ok,error}=await sb.rpc('eh_membro');
   if(error){console.error(error);S.offline=true;render();return}
   S.semAcesso=!ok;S.canWrite=!!ok;
@@ -1583,7 +1586,16 @@ document.getElementById('loginForm').addEventListener('submit',async e=>{
     lgMsg(/invalid login/i.test(m)?'E-mail ou senha incorretos.':/not confirmed/i.test(m)?'Confirme seu e-mail pelo link que enviamos antes de entrar.':/already registered/i.test(m)?'Este e-mail já tem conta. Use “Já tenho conta. Entrar”.':/email rate limit/i.test(m)?'O sistema atingiu o limite de e-mails de confirmação por hora (não é por causa das suas tentativas). Tente de novo em uma hora ou fale com quem administra o AIME Financy.':/rate limit/i.test(m)?'Muitas tentativas seguidas. Espere alguns minutos.':'Não deu certo: '+m);
   }finally{btn.disabled=false}
 });
-document.getElementById('btnSair').onclick=()=>sb.auth.signOut();
+// sair sempre funciona: se o servidor não responder (internet fraca, sessão vencida), o signOut do supabase
+// devolvia erro e deixava a sessão guardada; agora apaga a sessão do aparelho e volta para a tela de entrada
+async function sair(){
+  const b=document.getElementById('btnSair');b.disabled=true;b.textContent='Saindo…';
+  try{await Promise.race([sb.auth.signOut({scope:'local'}),new Promise(r=>setTimeout(r,3000))])}catch(_){}
+  try{Object.keys(localStorage).filter(k=>/^sb-.*-auth-token/.test(k)||k==='km-view').forEach(k=>localStorage.removeItem(k))}catch(_){}
+  try{sessionStorage.clear()}catch(_){}
+  location.replace(location.pathname+'?saiu='+Date.now());
+}
+document.getElementById('btnSair').onclick=sair;
 
 async function boot(){
   render();
